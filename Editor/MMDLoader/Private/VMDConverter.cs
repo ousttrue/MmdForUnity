@@ -53,7 +53,7 @@ namespace MMD
 
 			CreateKeysForSkin(format, clip);	// 表情の追加
 			
-			SetAnimationType(clip, assign_pmd); //アニメーションタイプの設定
+			//SetAnimationType(clip, assign_pmd); //アニメーションタイプの設定
 			
 			return clip;
 		}
@@ -537,6 +537,7 @@ namespace MMD
 			}
 		}
 
+        /*
 		/// <summary>
 		/// アニメーションタイプの設定
 		/// </summary>
@@ -555,6 +556,7 @@ namespace MMD
 			}
 			AnimationUtility.SetAnimationType(clip, animation_type);
 		}
+        */
 		
 		private float scale_ = 1.0f;
 	}

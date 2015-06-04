@@ -1390,7 +1390,7 @@ namespace MMD
 			
 			//材質リアサイン辞書の作成
 			Dictionary<uint, uint>[] material_reassign_dictionary = new Dictionary<uint, uint>[creation_info.Length + 1];
-			for (int i = 0, i_max = creation_info.Length; i < i_max; +++i) {
+			for (int i = 0, i_max = creation_info.Length; i < i_max; ++i) {
 				material_reassign_dictionary[i] = new Dictionary<uint, uint>();
 				for (uint k = 0, k_max = (uint)creation_info[i].value.Length; k < k_max; ++k) {
 					material_reassign_dictionary[i][creation_info[i].value[k].material_index] = k;
@@ -1576,7 +1576,7 @@ namespace MMD
 			GameObject[] result = format_.rigidbody_list.rigidbody.Select(x=>ConvertRigidbody(x)).ToArray();
 			for (uint i = 0, i_max = (uint)result.Length; i < i_max; ++i) {
 				// マテリアルの設定
-				result[i].collider.material = CreatePhysicMaterial(format_.rigidbody_list.rigidbody, i);
+				result[i].GetComponent<Collider>().material = CreatePhysicMaterial(format_.rigidbody_list.rigidbody, i);
 				
 			}
 			
@@ -1817,14 +1817,14 @@ namespace MMD
 			foreach (PMXFormat.Joint joint in format_.rigidbody_joint_list.joint) {
 				//相互接続する剛体の取得
 				Transform transform_a = rigids[joint.rigidbody_a].transform;
-				Rigidbody rigidbody_a = transform_a.rigidbody;
+				Rigidbody rigidbody_a = transform_a.GetComponent<UnityEngine.Rigidbody>();
 				if (null == rigidbody_a) {
-					rigidbody_a = transform_a.parent.rigidbody;
+					rigidbody_a = transform_a.parent.GetComponent<UnityEngine.Rigidbody>();
 				}
 				Transform transform_b = rigids[joint.rigidbody_b].transform;
-				Rigidbody rigidbody_b = transform_b.rigidbody;
+				Rigidbody rigidbody_b = transform_b.GetComponent<UnityEngine.Rigidbody>();
 				if (null == rigidbody_b) {
-					rigidbody_b = transform_b.parent.rigidbody;
+					rigidbody_b = transform_b.parent.GetComponent<UnityEngine.Rigidbody>();
 				}
 				if (rigidbody_a != rigidbody_b) {
 					//接続する剛体が同じ剛体を指さないなら
