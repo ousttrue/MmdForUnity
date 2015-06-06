@@ -26,11 +26,9 @@ namespace MMD
 		/// <param name='use_ik'>IKを使用するか</param>
 		/// <param name='scale'>スケール</param>
 		public static GameObject CreateGameObject(PMXFormat format, bool use_rigidbody, AnimationType animation_type, bool use_ik, float scale) {
-			GameObject result;
 			using (PMXConverter converter = new PMXConverter()) {
-				result = converter.CreateGameObject_(format, use_rigidbody, animation_type, use_ik, scale);
+				return converter.CreateGameObject_(format, use_rigidbody, animation_type, use_ik, scale);
 			}
-			return result;
 		}
 
 		/// <summary>
@@ -59,12 +57,15 @@ namespace MMD
 		/// <param name='animation_type'>アニメーションタイプ</param>
 		/// <param name='use_ik'>IKを使用するか</param>
 		/// <param name='scale'>スケール</param>
-		private GameObject CreateGameObject_(PMXFormat format, bool use_rigidbody, AnimationType animation_type, bool use_ik, float scale) {
+		private GameObject CreateGameObject_(PMXFormat format, bool use_rigidbody, AnimationType animation_type, bool use_ik, float scale) 
+        {
 			format_ = format;
 			use_ik_ = use_ik;
 			scale_ = scale;
 			root_game_object_ = new GameObject(format_.meta_header.name);
-			MMDEngine engine = root_game_object_.AddComponent<MMDEngine>(); //MMDEngine追加
+
+            //MMDEngine追加
+			MMDEngine engine = root_game_object_.AddComponent<MMDEngine>();
 			//スケール・エッジ幅
 			engine.scale = scale_;
 			engine.outline_width = 1.0f;
@@ -72,25 +73,42 @@ namespace MMD
 			engine.enable_render_queue = false; //初期値無効
 			const int c_render_queue_transparent = 3000;
 			engine.render_queue_value = c_render_queue_transparent;
-			
-			MeshCreationInfo[] creation_info = CreateMeshCreationInfo();				// メッシュを作成する為の情報を作成
+
+            const float progressUnit = (1.0f / 3.0f) / 7.0f;
+            float progress = 1.0f / 3.0f;
+
+            EditorUtility.DisplayProgressBar("CreatePrefab", "Import Pmx(CreteMesh)...", progress);
+            MeshCreationInfo[] creation_info = CreateMeshCreationInfo();				// メッシュを作成する為の情報を作成
 			Mesh[] mesh = CreateMesh(creation_info);									// メッシュの生成・設定
-			Material[][] materials = CreateMaterials(creation_info);					// マテリアルの生成・設定
-			GameObject[] bones = CreateBones();											// ボーンの生成・設定
-			SkinnedMeshRenderer[] renderers = BuildingBindpose(mesh, materials, bones);	// バインドポーズの作成
+            progress += progressUnit;
+
+            EditorUtility.DisplayProgressBar("CreatePrefab", "Import Pmx(CreteMaterials)...", progress);
+            Material[][] materials = CreateMaterials(creation_info);					// マテリアルの生成・設定
+            progress += progressUnit;
+
+            EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(CreteMaterials)...", progress);
+            GameObject[] bones = CreateBones();											// ボーンの生成・設定
+            SkinnedMeshRenderer[] renderers = BuildingBindpose(mesh, materials, bones);	// バインドポーズの作成
+            progress += progressUnit;
+
+            EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(CreateMorph)...", progress);
 			CreateMorph(mesh, materials, bones, renderers, creation_info);				// モーフの生成・設定
-			
-	
-			// BoneController・IKの登録(use_ik_を使った判定はEntryBoneController()の中で行う)
+            progress += progressUnit;
+
+            EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(EntryBoneController)...", progress);
+            // BoneController・IKの登録(use_ik_を使った判定はEntryBoneController()の中で行う)
 			{
 				engine.bone_controllers = EntryBoneController(bones);
 				engine.ik_list = engine.bone_controllers.Where(x=>null != x.ik_solver)
 														.Select(x=>x.ik_solver)
 														.ToArray();
 			}
+            progress += progressUnit;
 	
 			// 剛体関連
-			if (use_rigidbody) {
+            EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(RigidBody)...", progress);
+            if (use_rigidbody)
+            {
 				GameObject[] rigids = CreateRigids();
 				AssignRigidbodyToBone(bones, rigids);
 				SetRigidsSettings(bones, rigids);
@@ -103,9 +121,12 @@ namespace MMD
 
 				MMDEngine.Initialize(engine, groupTarget, ignoreGroups, rigids);
 			}
+            progress += progressUnit;
 	
 			// Mecanim設定
-			if (AnimationType.LegacyAnimation != animation_type) {
+            EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(Animation)...", progress);
+            if (AnimationType.LegacyAnimation != animation_type)
+            {
 				//アニメーター追加
 				AvatarSettingScript avatar_setting = new AvatarSettingScript(root_game_object_, bones);
 				switch (animation_type) {
@@ -126,6 +147,7 @@ namespace MMD
 			} else {
 				root_game_object_.AddComponent<Animation>();	// アニメーション追加
 			}
+            progress += progressUnit;
 
 			return root_game_object_;
 		}
