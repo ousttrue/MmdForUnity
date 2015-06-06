@@ -1,20 +1,107 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using MMD.PMX;
+using System;
 
 namespace MMD
 {
+    public static class IEnumerableExtensions
+    {
+        public static void ForEach<T>(this IEnumerable<T> enumerable, Action<T, int> pred)
+        {
+            int i = 0;
+            foreach(var e in enumerable)
+            {
+                pred(e, i++);
+            }
+        }
+    }
+
     /// <summary>
     /// サブメッシュ
     /// </summary>
     public class Submesh
     {
         //マテリアル
-        public int material_index;
+        public int material_index
+        {
+            get;
+            private set;
+        }
         //面
-        public int[] indices;
+        public int[] indices
+        {
+            get;
+            private set;
+        }
         //頂点
-        public int unique_vertex_count;		
+        public int unique_vertex_count
+        {
+            get;
+            private set;
+        }
+
+        public Submesh(int index, IEnumerable<int> indices)
+        {
+            this.material_index = index;
+            this.indices = indices.ToArray();
+            unique_vertex_count = this.indices.Distinct().Count(); //重複削除
+        }
+
+        /// <summary>
+        /// 1マテリアルの頂点数が1メッシュで表現出来ない場合に分割する
+        /// </summary>
+        /// <returns>メッシュ作成情報のマテリアルパック</returns>
+        /// <param name='creation_infos'>メッシュ作成情報のマテリアルパック</param>
+        public IEnumerable<Submesh> SplitSubMesh(int max_vertex_count)
+        {
+            if (max_vertex_count <= unique_vertex_count)
+            {
+                //1メッシュに収まらないなら
+                //分離
+                int plane_end = indices.Length;
+                int plane_start = 0;
+                while (plane_start < plane_end)
+                {
+                    //まだ面が有るなら
+                    int plane_count = 0;
+                    int vertex_count = 0;
+                    while (true)
+                    {
+                        //現在の頂点数から考えると、余裕分の1/3迄の数の面は安定して入る
+                        //はみ出て欲しいから更に1面(3頂点)を足す
+                        plane_count += (max_vertex_count - vertex_count) / 3 * 3 + 3;
+                        vertex_count = indices.Skip(plane_start)	//面頂点インデックス取り出し(先頭)
+                                                                .Take(plane_count)	//面頂点インデックス取り出し(末尾)
+                                                                .Distinct()				//重複削除
+                                                                .Count();				//個数取得
+                        if (max_vertex_count <= vertex_count)
+                        {
+                            //1メッシュを超えているなら
+                            //此処でのメッシュ超えは必ずc_max_vertex_count_in_meshぎりぎりで有り、1面(3頂点)を1つ取れば収まる様になっている
+                            plane_count -= 3;
+                            break;
+                        }
+                        if (plane_end <= (plane_start + plane_count))
+                        {
+                            //面の最後なら
+                            break;
+                        }
+                    }
+                    //分離分を戻り値の追加
+                    yield return  new Submesh(material_index, indices.Skip(plane_start).Take(plane_count));
+
+                    //開始点を後ろに
+                    plane_start += plane_count;
+                }
+            }
+            else
+            {
+                //1メッシュに収まるなら
+                //素通し
+                yield return this;
+            }
+        }
     }
 
     /// <summary>
@@ -26,9 +113,31 @@ namespace MMD
         //総頂点
         public int[] all_vertices;
         //頂点リアサインインデックス用辞書
-        public Dictionary<int, int> reassign_dictionary;	
+        public Dictionary<int, int> reassign_dictionary;
     }
 
+    static class PMXFormatExtensions
+    {
+        /// <summary>
+        /// 全マテリアルをメッシュ作成情報のマテリアルパックとして返す
+        /// </summary>
+        /// <returns>メッシュ作成情報のマテリアルパック</returns>
+        public static IEnumerable<Submesh> CreateMeshCreationInfoPacks(this PMXFormat format)
+        {
+            int plane_start = 0;
+            //マテリアル単位のPackを作成する
+            return format.materials
+                            .Select((m, x) =>
+                            {
+                                var pack = new Submesh(x, format.indices
+                                        .Skip(plane_start)
+                                        .Take(m.face_vert_count));
+                                plane_start += m.face_vert_count;
+                                return pack;
+                            })
+                            ;
+        }
+    }
 
     public class PMXConverter : System.IDisposable
     {
@@ -106,21 +215,32 @@ namespace MMD
             float progress = 1.0f / 3.0f;
 
             UnityEditor.EditorUtility.DisplayProgressBar("CreatePrefab", "Import Pmx(CreteMesh)...", progress);
-            var creation_info = CreateMeshCreationInfoMulti();				// メッシュを作成する為の情報を作成
-            var mesh = CreateMesh(creation_info);									// メッシュの生成・設定
+            // メッシュを作成する為の情報を作成
+            var creation_info = CreateMeshCreationInfoMulti(format).ToArray();				
+            // メッシュの生成・設定
+            var meshes = creation_info.Select((c, i)=>{
+                var mesh = new UnityEngine.Mesh();
+                EntryAttributesForMesh(mesh, c);
+                SetSubMesh(mesh, c);
+                CreateAssetForMesh(mesh, i);
+                return mesh;
+            }).ToArray();									
             progress += progressUnit;
 
             UnityEditor.EditorUtility.DisplayProgressBar("CreatePrefab", "Import Pmx(CreteMaterials)...", progress);
-            var materials = CreateMaterials(creation_info);					// マテリアルの生成・設定
+            // マテリアルの生成・設定
+            var materials = CreateMaterials(creation_info).ToArray();					
             progress += progressUnit;
 
             UnityEditor.EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(CreteMaterials)...", progress);
-            UnityEngine.GameObject[] bones = CreateBones();											// ボーンの生成・設定
-            var renderers = BuildingBindpose(mesh, materials, bones);	// バインドポーズの作成
+            // ボーンの生成・設定
+            UnityEngine.GameObject[] bones = CreateBones();
+            // バインドポーズの作成							
+            var renderers = BuildingBindpose(meshes, materials, bones).ToArray();	
             progress += progressUnit;
 
             UnityEditor.EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(CreateMorph)...", progress);
-            CreateMorph(mesh, materials, bones, renderers, creation_info);				// モーフの生成・設定
+            CreateMorph(meshes, materials, bones, renderers, creation_info);				// モーフの生成・設定
             progress += progressUnit;
 
             UnityEditor.EditorUtility.DisplayProgressBar("CreateBones", "Import Pmx(EntryBoneController)...", progress);
@@ -184,44 +304,19 @@ namespace MMD
         }
 
         /// <summary>
-        /// 全マテリアルをメッシュ作成情報のマテリアルパックとして返す
-        /// </summary>
-        /// <returns>メッシュ作成情報のマテリアルパック</returns>
-        static Submesh[] CreateMeshCreationInfoPacks(PMXFormat format)
-        {
-            int plane_start = 0;
-            //マテリアル単位のPackを作成する
-            return Enumerable.Range(0, format.materials.Length)
-                            .Select(x =>
-                            {
-                                Submesh pack = new Submesh();
-                                pack.material_index = x;
-                                var plane_count = format.materials[x].face_vert_count;
-                                pack.indices = format.indices
-                                    .Skip(plane_start)
-                                    .Take(plane_count)
-                                    .ToArray();
-                                pack.unique_vertex_count = pack.indices.Distinct().Count(); //重複削除
-                                plane_start += plane_count;
-                                return pack;
-                            })
-                            .ToArray();
-        }
-
-        /// <summary>
         /// メッシュを作成する為の情報を作成(複数メッシュ版)
         /// </summary>
         /// <returns>メッシュ作成情報</returns>
-        MeshCreationInfo[] CreateMeshCreationInfoMulti()
+        static IEnumerable<MeshCreationInfo> CreateMeshCreationInfoMulti(PMXFormat format)
         {
             //マテリアル単位のPackを作成する
-            Submesh[] packs = CreateMeshCreationInfoPacks(format_);
-            //マテリアル細分化
-            packs = SplitSubMesh(packs);
-            //頂点数の多い順に並べる(メッシュ分割アルゴリズム上、後半に行く程頂点数が少ない方が敷き詰め効率が良い)
-            System.Array.Sort(packs, (x, y) => y.unique_vertex_count - x.unique_vertex_count);
+            var packs = format.CreateMeshCreationInfoPacks()
+                //マテリアル細分化
+                .SelectMany(pack => pack.SplitSubMesh(c_max_vertex_count_in_mesh))
+                //頂点数の多い順に並べる(メッシュ分割アルゴリズム上、後半に行く程頂点数が少ない方が敷き詰め効率が良い)
+                .OrderByDescending(x => x.unique_vertex_count)
+                .ToArray();
 
-            List<MeshCreationInfo> result = new List<MeshCreationInfo>();
             do
             {
                 int vertex_sum = 0;
@@ -253,116 +348,8 @@ namespace MMD
                     info.reassign_dictionary[i] = reassign_index++;
                 }
                 //戻り値に追加
-                result.Add(info);
+                yield return info;
             } while (packs.Any(x => null != x)); //使用していないマテリアルが為るならループ
-            return result.ToArray();
-        }
-
-        /// <summary>
-        /// 1マテリアルの頂点数が1メッシュで表現出来ない場合に分割する
-        /// </summary>
-        /// <returns>メッシュ作成情報のマテリアルパック</returns>
-        /// <param name='creation_infos'>メッシュ作成情報のマテリアルパック</param>
-        Submesh[] SplitSubMesh(Submesh[] packs)
-        {
-            Submesh[] result = packs;
-            if (packs.Any(x => c_max_vertex_count_in_mesh <= x.unique_vertex_count))
-            {
-                //1メッシュに収まらないマテリアルが有るなら
-                List<Submesh> result_list = new List<Submesh>();
-                foreach (var pack in packs)
-                {
-                    if (c_max_vertex_count_in_mesh <= pack.unique_vertex_count)
-                    {
-                        //1メッシュに収まらないなら
-                        //分離
-                        var split_pack = SplitSubMesh(pack);
-                        foreach (var i in split_pack)
-                        {
-                            result_list.Add(i);
-                        }
-                    }
-                    else
-                    {
-                        //1メッシュに収まるなら
-                        //素通し
-                        result_list.Add(pack);
-                    }
-                }
-                result = result_list.ToArray();
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// 1マテリアルの頂点数が1メッシュで表現出来ないので分割する
-        /// </summary>
-        /// <returns>メッシュ作成情報のマテリアルパック</returns>
-        /// <param name='creation_infos'>メッシュ作成情報のマテリアルパック</param>
-        List<Submesh> SplitSubMesh(Submesh pack)
-        {
-            List<Submesh> result = new List<Submesh>();
-            //1メッシュに収まらないなら
-            int plane_end = pack.indices.Length;
-            int plane_start = 0;
-            while (plane_start < plane_end)
-            {
-                //まだ面が有るなら
-                int plane_count = 0;
-                int vertex_count = 0;
-                while (true)
-                {
-                    //現在の頂点数から考えると、余裕分の1/3迄の数の面は安定して入る
-                    //はみ出て欲しいから更に1面(3頂点)を足す
-                    plane_count += (c_max_vertex_count_in_mesh - vertex_count) / 3 * 3 + 3;
-                    vertex_count = pack.indices.Skip(plane_start)	//面頂点インデックス取り出し(先頭)
-                                                            .Take(plane_count)	//面頂点インデックス取り出し(末尾)
-                                                            .Distinct()				//重複削除
-                                                            .Count();				//個数取得
-                    if (c_max_vertex_count_in_mesh <= vertex_count)
-                    {
-                        //1メッシュを超えているなら
-                        //此処でのメッシュ超えは必ずc_max_vertex_count_in_meshぎりぎりで有り、1面(3頂点)を1つ取れば収まる様になっている
-                        plane_count -= 3;
-                        break;
-                    }
-                    if (plane_end <= (plane_start + plane_count))
-                    {
-                        //面の最後なら
-                        break;
-                    }
-                }
-                //分離分を戻り値の追加
-                Submesh result_pack = new Submesh(); ;
-                result_pack.material_index = pack.material_index;
-                result_pack.indices = pack.indices.Skip(plane_start)	//面頂点インデックス取り出し(先頭)
-                                                                .Take(plane_count)	//面頂点インデックス取り出し(末尾)
-                                                                .ToArray();
-                result_pack.unique_vertex_count = result_pack.indices.Distinct().Count();	//重複削除
-                result.Add(result_pack);
-                //開始点を後ろに
-                plane_start += plane_count;
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// メッシュ作成
-        /// </summary>
-        /// <returns>メッシュ</returns>
-        /// <param name='creation_info'>メッシュ作成情報</param>
-        UnityEngine.Mesh[] CreateMesh(MeshCreationInfo[] creation_info)
-        {
-            var result = new UnityEngine.Mesh[creation_info.Length];
-            for (int i = 0, i_max = creation_info.Length; i < i_max; ++i)
-            {
-                var mesh = new UnityEngine.Mesh();
-                EntryAttributesForMesh(mesh, creation_info[i]);
-                SetSubMesh(mesh, creation_info[i]);
-                CreateAssetForMesh(mesh, i);
-                result[i] = mesh;
-            }
-            return result;
         }
 
         /// <summary>
@@ -466,7 +453,7 @@ namespace MMD
         /// </summary>
         /// <returns>マテリアル</returns>
         /// <param name='creation_info'>メッシュ作成情報</param>
-        UnityEngine.Material[][] CreateMaterials(MeshCreationInfo[] creation_info)
+        IEnumerable<UnityEngine.Material[]> CreateMaterials(IEnumerable<MeshCreationInfo> creation_info)
         {
             // 適当なフォルダに投げる
             string path = format_.meta_header.folder + "/Materials/";
@@ -480,13 +467,7 @@ namespace MMD
             CreateAssetForMaterials(materials);
 
             //メッシュ単位へ振り分け
-            var result = new UnityEngine.Material[creation_info.Length][];
-            for (int i = 0, i_max = creation_info.Length; i < i_max; ++i)
-            {
-                result[i] = creation_info[i].submeshes.Select(x => materials[x.material_index]).ToArray();
-            }
-
-            return result;
+            return creation_info.Select(c => c.submeshes.Select(x => materials[x.material_index]).ToArray());
         }
 
         /// <summary>
@@ -602,7 +583,7 @@ namespace MMD
         /// </remarks>
         UnityEngine.Vector2[][] GetUvList()
         {
-            var vertex_list = CreateMeshCreationInfoPacks(format_).Select(x => x.indices).ToArray();
+            var vertex_list = format_.CreateMeshCreationInfoPacks().Select(x => x.indices).ToArray();
 
             var uv_morphs = format_.morphs
                                                             .Where(x => PMXFormat.MorphData.MorphType.Uv == x.morph_type) //UVモーフなら
@@ -784,7 +765,7 @@ namespace MMD
 
             //先にテクスチャ情報を検索
             UnityEngine.Texture2D main_texture = null;
-            if (material.usually_texture_index>-1 && material.usually_texture_index < format_.textures.Length)
+            if (material.usually_texture_index > -1 && material.usually_texture_index < format_.textures.Length)
             {
                 string texture_file_name = format_.textures[material.usually_texture_index];
                 string path = format_.meta_header.folder + "/" + texture_file_name;
@@ -822,7 +803,7 @@ namespace MMD
             }
 
             // スフィアテクスチャ
-            if (material.sphere_texture_index>-1 && material.sphere_texture_index < format_.textures.Length)
+            if (material.sphere_texture_index > -1 && material.sphere_texture_index < format_.textures.Length)
             {
                 string sphere_texture_file_name = format_.textures[material.sphere_texture_index];
                 string path = format_.meta_header.folder + "/" + sphere_texture_file_name;
@@ -856,7 +837,7 @@ namespace MMD
                     //共通トゥーン
                     toon_texture_name = "toon" + material.common_toon.ToString("00") + ".bmp";
                 }
-                else if (material.toon_texture_index>-1 && material.toon_texture_index < format_.textures.Length)
+                else if (material.toon_texture_index > -1 && material.toon_texture_index < format_.textures.Length)
                 {
                     //自前トゥーン
                     toon_texture_name = format_.textures[material.toon_texture_index];
@@ -1065,7 +1046,7 @@ namespace MMD
             for (int i = 0, i_max = format_.bones.Length; i < i_max; ++i)
             {
                 int parent_bone_index = format_.bones[i].parent_bone_index;
-                if (parent_bone_index>-1 && parent_bone_index < bones.Length)
+                if (parent_bone_index > -1 && parent_bone_index < bones.Length)
                 {
                     //親のボーンが有るなら
                     //それの子に為る
@@ -1581,7 +1562,7 @@ namespace MMD
         /// <param name='mesh'>対象メッシュ</param>
         /// <param name='materials'>設定するマテリアル</param>
         /// <param name='bones'>設定するボーン</param>
-        UnityEngine.SkinnedMeshRenderer[] BuildingBindpose(UnityEngine.Mesh[] mesh, UnityEngine.Material[][] materials, UnityEngine.GameObject[] bones)
+        IEnumerable<UnityEngine.SkinnedMeshRenderer> BuildingBindpose(IEnumerable<UnityEngine.Mesh> meshes, UnityEngine.Material[][] materials, UnityEngine.GameObject[] bones)
         {
             // メッシュルートを生成してルートの子供に付ける
             var mesh_root_transform = (new UnityEngine.GameObject("Mesh")).transform;
@@ -1594,22 +1575,19 @@ namespace MMD
             var bones_transform = bones.Select(x => x.transform).ToArray();
 
             //レンダー設定
-            var result = new UnityEngine.SkinnedMeshRenderer[mesh.Length];
-            for (int i = 0, i_max = mesh.Length; i < i_max; ++i)
+            return meshes.Select((m, i) =>
             {
                 var mesh_transform = (new UnityEngine.GameObject("Mesh" + i.ToString())).transform;
                 mesh_transform.parent = mesh_root_transform;
                 var smr = mesh_transform.gameObject.AddComponent<UnityEngine.SkinnedMeshRenderer>();
-                mesh[i].bindposes = bindposes;
-                smr.sharedMesh = mesh[i];
+                m.bindposes = bindposes;
+                smr.sharedMesh = m;
                 smr.bones = bones_transform;
                 smr.materials = materials[i];
                 smr.rootBone = model_root_transform;
                 smr.receiveShadows = false; //影を受けない
-
-                result[i] = smr;
-            }
-            return result;
+                return smr;
+            });
         }
 
         /// <summary>
