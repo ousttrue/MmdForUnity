@@ -643,7 +643,6 @@ namespace MMD
 					break;
 				}
 			}
-			EditorUtility.ClearProgressBar();
 
 			return result.Select(x=>x.ToArray()).ToArray();
 		}
