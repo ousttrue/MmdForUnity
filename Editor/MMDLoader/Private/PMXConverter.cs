@@ -4,6 +4,32 @@ using MMD.PMX;
 
 namespace MMD
 {
+    /// <summary>
+    /// サブメッシュ
+    /// </summary>
+    public class Submesh
+    {
+        //マテリアル
+        public uint material_index;
+        //面
+        public uint[] indices;
+        //頂点
+        public int unique_vertex_count;		
+    }
+
+    /// <summary>
+    /// メッシュを作成する時に参照するデータの纏め
+    /// </summary>
+    class MeshCreationInfo
+    {
+        public Submesh[] submeshes;
+        //総頂点
+        public uint[] all_vertices;
+        //頂点リアサインインデックス用辞書
+        public Dictionary<uint, uint> reassign_dictionary;	
+    }
+
+
     public class PMXConverter : System.IDisposable
     {
         /// <summary>
@@ -157,21 +183,6 @@ namespace MMD
             return root_game_object_;
         }
 
-        /// <summary>
-        /// メッシュを作成する時に参照するデータの纏め
-        /// </summary>
-        class MeshCreationInfo
-        {
-            public class Pack
-            {
-                public uint material_index;	//マテリアル
-                public uint[] plane_indices;	//面
-                public uint[] vertices;		//頂点
-            }
-            public Pack[] value;
-            public uint[] all_vertices;			//総頂点
-            public Dictionary<uint, uint> reassign_dictionary;	//頂点リアサインインデックス用辞書
-        }
 
         /// <summary>
         /// メッシュを作成する為の情報を作成
@@ -211,7 +222,7 @@ namespace MMD
         {
             MeshCreationInfo[] result = new[] { new MeshCreationInfo() };
             //全マテリアルを設定
-            result[0].value = CreateMeshCreationInfoPacks();
+            result[0].submeshes = CreateMeshCreationInfoPacks();
             //全頂点を設定
             result[0].all_vertices = Enumerable.Range(0, format_.vertex_list.vertex.Length).Select(x => (uint)x).ToArray();
             //頂点リアサインインデックス用辞書作成
@@ -227,21 +238,20 @@ namespace MMD
         /// 全マテリアルをメッシュ作成情報のマテリアルパックとして返す
         /// </summary>
         /// <returns>メッシュ作成情報のマテリアルパック</returns>
-        MeshCreationInfo.Pack[] CreateMeshCreationInfoPacks()
+        Submesh[] CreateMeshCreationInfoPacks()
         {
             uint plane_start = 0;
-            //マテリアル単位のMeshCreationInfo.Packを作成する
+            //マテリアル単位のPackを作成する
             return Enumerable.Range(0, format_.material_list.material.Length)
                             .Select(x =>
                             {
-                                MeshCreationInfo.Pack pack = new MeshCreationInfo.Pack();
+                                Submesh pack = new Submesh();
                                 pack.material_index = (uint)x;
                                 uint plane_count = format_.material_list.material[x].face_vert_count;
-                                pack.plane_indices = format_.face_vertex_list.face_vert_index.Skip((int)plane_start)
+                                pack.indices = format_.face_vertex_list.face_vert_index.Skip((int)plane_start)
                                                                                                     .Take((int)plane_count)
                                                                                                     .ToArray();
-                                pack.vertices = pack.plane_indices.Distinct() //重複削除
-                                                                    .ToArray();
+                                pack.unique_vertex_count = pack.indices.Distinct().Count(); //重複削除
                                 plane_start += plane_count;
                                 return pack;
                             })
@@ -254,12 +264,12 @@ namespace MMD
         /// <returns>メッシュ作成情報</returns>
         MeshCreationInfo[] CreateMeshCreationInfoMulti()
         {
-            //マテリアル単位のMeshCreationInfo.Packを作成する
-            MeshCreationInfo.Pack[] packs = CreateMeshCreationInfoPacks();
+            //マテリアル単位のPackを作成する
+            Submesh[] packs = CreateMeshCreationInfoPacks();
             //マテリアル細分化
             packs = SplitSubMesh(packs);
             //頂点数の多い順に並べる(メッシュ分割アルゴリズム上、後半に行く程頂点数が少ない方が敷き詰め効率が良い)
-            System.Array.Sort(packs, (x, y) => y.vertices.Length - x.vertices.Length);
+            System.Array.Sort(packs, (x, y) => y.unique_vertex_count - x.unique_vertex_count);
 
             List<MeshCreationInfo> result = new List<MeshCreationInfo>();
             do
@@ -267,11 +277,11 @@ namespace MMD
                 uint vertex_sum = 0;
                 MeshCreationInfo info = new MeshCreationInfo();
                 //マテリアルパック作成
-                info.value = Enumerable.Range(0, packs.Length)
+                info.submeshes = Enumerable.Range(0, packs.Length)
                                         .Where(x => null != packs[x]) //有効なマテリアルに絞る
                                         .Where(x =>
                                         {	//採用しても頂点数が限界を超えないなら
-                                            vertex_sum += (uint)packs[x].vertices.Length;
+                                            vertex_sum += (uint)packs[x].unique_vertex_count;
                                             return vertex_sum < c_max_vertex_count_in_mesh;
                                         })
                                         .Select(x =>
@@ -282,10 +292,9 @@ namespace MMD
                                         })
                                         .ToArray();
                 //マテリアルインデックスに並べる(メッシュの選定が終わったので見易い様に並びを戻す)
-                System.Array.Sort(info.value, (x, y) => ((x.material_index > y.material_index) ? 1 : (x.material_index < y.material_index) ? -1 : 0));
+                System.Array.Sort(info.submeshes, (x, y) => ((x.material_index > y.material_index) ? 1 : (x.material_index < y.material_index) ? -1 : 0));
                 //総頂点作成
-                info.all_vertices = info.value.SelectMany(x => x.vertices).Distinct().ToArray();
-                System.Array.Sort(info.all_vertices);
+                info.all_vertices = info.submeshes.SelectMany(x => x.indices).OrderBy(x => x).Distinct().ToArray();
                 //頂点リアサインインデックス用辞書作成
                 info.reassign_dictionary = new Dictionary<uint, uint>();
                 uint reassign_index = 0;
@@ -304,16 +313,16 @@ namespace MMD
         /// </summary>
         /// <returns>メッシュ作成情報のマテリアルパック</returns>
         /// <param name='creation_infos'>メッシュ作成情報のマテリアルパック</param>
-        MeshCreationInfo.Pack[] SplitSubMesh(MeshCreationInfo.Pack[] packs)
+        Submesh[] SplitSubMesh(Submesh[] packs)
         {
-            MeshCreationInfo.Pack[] result = packs;
-            if (packs.Any(x => c_max_vertex_count_in_mesh <= x.vertices.Length))
+            Submesh[] result = packs;
+            if (packs.Any(x => c_max_vertex_count_in_mesh <= x.unique_vertex_count))
             {
                 //1メッシュに収まらないマテリアルが有るなら
-                List<MeshCreationInfo.Pack> result_list = new List<MeshCreationInfo.Pack>();
+                List<Submesh> result_list = new List<Submesh>();
                 foreach (var pack in packs)
                 {
-                    if (c_max_vertex_count_in_mesh <= pack.vertices.Length)
+                    if (c_max_vertex_count_in_mesh <= pack.unique_vertex_count)
                     {
                         //1メッシュに収まらないなら
                         //分離
@@ -340,11 +349,11 @@ namespace MMD
         /// </summary>
         /// <returns>メッシュ作成情報のマテリアルパック</returns>
         /// <param name='creation_infos'>メッシュ作成情報のマテリアルパック</param>
-        List<MeshCreationInfo.Pack> SplitSubMesh(MeshCreationInfo.Pack pack)
+        List<Submesh> SplitSubMesh(Submesh pack)
         {
-            List<MeshCreationInfo.Pack> result = new List<MeshCreationInfo.Pack>();
+            List<Submesh> result = new List<Submesh>();
             //1メッシュに収まらないなら
-            uint plane_end = (uint)pack.plane_indices.Length;
+            uint plane_end = (uint)pack.indices.Length;
             uint plane_start = 0;
             while (plane_start < plane_end)
             {
@@ -356,7 +365,7 @@ namespace MMD
                     //現在の頂点数から考えると、余裕分の1/3迄の数の面は安定して入る
                     //はみ出て欲しいから更に1面(3頂点)を足す
                     plane_count += (c_max_vertex_count_in_mesh - vertex_count) / 3 * 3 + 3;
-                    vertex_count = (uint)pack.plane_indices.Skip((int)plane_start)	//面頂点インデックス取り出し(先頭)
+                    vertex_count = (uint)pack.indices.Skip((int)plane_start)	//面頂点インデックス取り出し(先頭)
                                                             .Take((int)plane_count)	//面頂点インデックス取り出し(末尾)
                                                             .Distinct()				//重複削除
                                                             .Count();				//個数取得
@@ -374,13 +383,12 @@ namespace MMD
                     }
                 }
                 //分離分を戻り値の追加
-                MeshCreationInfo.Pack result_pack = new MeshCreationInfo.Pack(); ;
+                Submesh result_pack = new Submesh(); ;
                 result_pack.material_index = pack.material_index;
-                result_pack.plane_indices = pack.plane_indices.Skip((int)plane_start)	//面頂点インデックス取り出し(先頭)
+                result_pack.indices = pack.indices.Skip((int)plane_start)	//面頂点インデックス取り出し(先頭)
                                                                 .Take((int)plane_count)	//面頂点インデックス取り出し(末尾)
                                                                 .ToArray();
-                result_pack.vertices = result_pack.plane_indices.Distinct()	//重複削除
-                                                                .ToArray();
+                result_pack.unique_vertex_count = result_pack.indices.Distinct().Count();	//重複削除
                 result.Add(result_pack);
                 //開始点を後ろに
                 plane_start += plane_count;
@@ -475,11 +483,11 @@ namespace MMD
             // マテリアル対サブメッシュ
             // サブメッシュとはマテリアルに適用したい面頂点データのこと
             // 面ごとに設定するマテリアルはここ
-            mesh.subMeshCount = creation_info.value.Length;
-            for (int i = 0, i_max = creation_info.value.Length; i < i_max; ++i)
+            mesh.subMeshCount = creation_info.submeshes.Length;
+            for (int i = 0, i_max = creation_info.submeshes.Length; i < i_max; ++i)
             {
                 //format_.face_vertex_list.face_vert_indexを[start](含む)から[start+count](含まず)迄取り出し
-                int[] indices = creation_info.value[i].plane_indices.Select(x => (int)creation_info.reassign_dictionary[x]) //頂点リアサインインデックス変換
+                int[] indices = creation_info.submeshes[i].indices.Select(x => (int)creation_info.reassign_dictionary[x]) //頂点リアサインインデックス変換
                                                                     .ToArray();
                 mesh.SetTriangles(indices, i);
             }
@@ -525,7 +533,7 @@ namespace MMD
             var result = new UnityEngine.Material[creation_info.Length][];
             for (int i = 0, i_max = creation_info.Length; i < i_max; ++i)
             {
-                result[i] = creation_info[i].value.Select(x => materials[x.material_index]).ToArray();
+                result[i] = creation_info[i].submeshes.Select(x => materials[x.material_index]).ToArray();
             }
 
             return result;
@@ -645,7 +653,7 @@ namespace MMD
         /// </remarks>
         UnityEngine.Vector2[][] GetUvList()
         {
-            uint[][] vertex_list = CreateMeshCreationInfoPacks().Select(x => x.plane_indices).ToArray();
+            uint[][] vertex_list = CreateMeshCreationInfoPacks().Select(x => x.indices).ToArray();
 
             Dictionary<uint, UnityEngine.Vector4>[] uv_morphs = format_.morph_list.morph_data
                                                             .Where(x => PMXFormat.MorphData.MorphType.Uv == x.morph_type) //UVモーフなら
@@ -1543,9 +1551,9 @@ namespace MMD
             for (int i = 0, i_max = creation_info.Length; i < i_max; ++i)
             {
                 material_reassign_dictionary[i] = new Dictionary<uint, uint>();
-                for (uint k = 0, k_max = (uint)creation_info[i].value.Length; k < k_max; ++k)
+                for (uint k = 0, k_max = (uint)creation_info[i].submeshes.Length; k < k_max; ++k)
                 {
-                    material_reassign_dictionary[i][creation_info[i].value[k].material_index] = k;
+                    material_reassign_dictionary[i][creation_info[i].submeshes[k].material_index] = k;
                 }
                 if (-1 == indices.LastOrDefault())
                 {
