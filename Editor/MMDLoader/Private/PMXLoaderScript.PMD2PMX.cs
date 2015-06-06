@@ -53,22 +53,22 @@ public partial class PMXLoaderScript {
 	/// <returns>テクスチャインデックス</returns>
 	/// <param name="list">テクスチャリスト</param>
 	/// <param name="name">検索するテクスチャ名</param>
-	private static uint CreateTextureIndex(ref string[] list, string name) {
-		uint result = uint.MaxValue;
+	private static int CreateTextureIndex(ref string[] list, string name) {
+		int result = -1;
 		for (int i = 0, i_max = list.Length; i < i_max; ++i) {
 			if (name == list[i]) {
 				//発見したらインデックスを返す
-				result = (uint)i;
+				result = i;
 				break;
 			}
 		}
-		if (uint.MaxValue == result) {
+		if (-1 == result) {
 			//未発見なら
 			//末尾に登録して返す
 			string[] new_list = new string[list.Length + 1];
 			System.Array.Copy(list, new_list, list.Length);
 			new_list[list.Length] = name; //最後に追加
-			result = (uint)list.Length;
+			result = list.Length;
 			list = new_list;
 		}
 		return result;
@@ -154,7 +154,7 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 	
-	private static PMXFormat.Material ConvertMaterial(PMDFormat pmd, int material_index, System.Func<string, uint> get_texture_index) {
+	private static PMXFormat.Material ConvertMaterial(PMDFormat pmd, int material_index, System.Func<string, int> get_texture_index) {
 		PMXFormat.Material result = new PMXFormat.Material();
 		PMDFormat.Material pmd_material = pmd.material_list.material[material_index];
 
@@ -176,11 +176,11 @@ public partial class PMXLoaderScript {
 		}
 		result.edge_color = Color.black;
 		result.edge_size = 1.0f;
-		result.usually_texture_index = uint.MaxValue;
+		result.usually_texture_index = -1;
 		if (!string.IsNullOrEmpty(pmd_material.texture_file_name)) {
 			result.usually_texture_index = get_texture_index(pmd_material.texture_file_name);
 		}
-		result.sphere_texture_index = uint.MaxValue;
+		result.sphere_texture_index = -1;
 		result.sphere_mode = PMXFormat.Material.SphereMode.Null;
 		if (!string.IsNullOrEmpty(pmd_material.sphere_map_name)) {
 			result.sphere_texture_index = get_texture_index(pmd_material.sphere_map_name);
@@ -191,9 +191,9 @@ public partial class PMXLoaderScript {
 			}
 		}
 		result.common_toon = pmd_material.toon_index;
-		result.toon_texture_index = ((0 < pmd_material.toon_index)? pmd_material.toon_index: uint.MaxValue);
+		result.toon_texture_index = ((0 < pmd_material.toon_index)? pmd_material.toon_index: -1);
 		result.memo = "";
-		result.face_vert_count = pmd_material.face_vert_count;
+		result.face_vert_count = (int)pmd_material.face_vert_count;
 		return result;
 	}
 
@@ -204,7 +204,7 @@ public partial class PMXLoaderScript {
 		result.bone_name = pmd_bone.bone_name;
 		result.bone_english_name = ((null != pmd.eg_bone_name_list)? pmd.eg_bone_name_list.bone_name_eg[bone_index]: null);
 		result.bone_position = pmd_bone.bone_head_pos;
-		result.parent_bone_index = ((ushort.MaxValue == pmd_bone.parent_bone_index)? uint.MaxValue: (uint)pmd_bone.parent_bone_index);
+		result.parent_bone_index = ((ushort.MaxValue == pmd_bone.parent_bone_index)? -1: pmd_bone.parent_bone_index);
 		result.transform_level = 0;
 		switch (pmd_bone.bone_type) {
 		case 0: //回転
@@ -294,7 +294,7 @@ public partial class PMXLoaderScript {
 
 	private static PMXFormat.VertexMorphOffset ConvertVertexMorphOffset(PMDFormat.SkinVertexData pmd_skin_vertex_data, Dictionary<uint, uint> morph_vertex_index_dictionary) {
 		PMXFormat.VertexMorphOffset result = new PMXFormat.VertexMorphOffset();
-		result.vertex_index = morph_vertex_index_dictionary[pmd_skin_vertex_data.skin_vert_index];
+		result.vertex_index = (int)morph_vertex_index_dictionary[pmd_skin_vertex_data.skin_vert_index];
 		result.position_offset = pmd_skin_vertex_data.skin_vert_pos;
 		return result;
 	}
@@ -316,7 +316,7 @@ public partial class PMXLoaderScript {
 		PMDFormat.Rigidbody pmd_rigidbody = pmd.rigidbody_list.rigidbody[rigidbody_index];
 		result.name = pmd_rigidbody.rigidbody_name;
 		result.english_name = "";
-		result.rel_bone_index = (uint)pmd_rigidbody.rigidbody_rel_bone_index;
+		result.rel_bone_index = pmd_rigidbody.rigidbody_rel_bone_index;
 		result.group_index = pmd_rigidbody.rigidbody_group_index;
 		result.ignore_collision_group = pmd_rigidbody.rigidbody_group_target;
 		result.shape_type = (PMXFormat.Rigidbody.ShapeType)pmd_rigidbody.shape_type;
@@ -342,8 +342,8 @@ public partial class PMXLoaderScript {
 		result.name = pmd_joint.joint_name;
 		result.english_name = "";
 		result.operation_type = PMXFormat.Joint.OperationType.Spring6DOF;
-		result.rigidbody_a = pmd_joint.joint_rigidbody_a;
-		result.rigidbody_b = pmd_joint.joint_rigidbody_b;
+		result.rigidbody_a = (int)pmd_joint.joint_rigidbody_a;
+		result.rigidbody_b = (int)pmd_joint.joint_rigidbody_b;
 		result.position = pmd_joint.joint_pos;
 		result.rotation = pmd_joint.joint_rot;
 		result.constrain_pos_lower = pmd_joint.constrain_pos_1;

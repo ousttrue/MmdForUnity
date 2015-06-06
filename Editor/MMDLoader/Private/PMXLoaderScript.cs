@@ -234,7 +234,7 @@ public partial class PMXLoaderScript {
 		PMXFormat.Header.IndexSize texture_index_size = ((result.common_toon == 0)? format_.header.textureIndexSize: PMXFormat.Header.IndexSize.Byte1);
 		result.toon_texture_index = CastIntRead(binary_reader_, texture_index_size);
 		result.memo = ReadString();
-		result.face_vert_count = binary_reader_.ReadUInt32(); // 面頂点数 // インデックスに変換する場合は、材質0から順に加算
+		result.face_vert_count = binary_reader_.ReadInt32(); // 面頂点数 // インデックスに変換する場合は、材質0から順に加算
 		return result;
 	}
 
@@ -267,7 +267,7 @@ public partial class PMXLoaderScript {
 			result.z_axis_vector = ReadSinglesToVector3(binary_reader_);
 		}
 		if((result.bone_flag & PMXFormat.Bone.Flag.ExternalParentTransform) != 0) {
-			result.key_value = binary_reader_.ReadUInt32();
+			result.key_value = binary_reader_.ReadInt32();
 		}
 		if((result.bone_flag & PMXFormat.Bone.Flag.IkFlag) != 0) {
 			result.ik_data = ReadIkData();
@@ -278,7 +278,7 @@ public partial class PMXLoaderScript {
 	private PMXFormat.IK_Data ReadIkData() {
 		PMXFormat.IK_Data result = new PMXFormat.IK_Data();
 		result.ik_bone_index = CastIntRead(binary_reader_, format_.header.boneIndexSize);
-		result.iterations = binary_reader_.ReadUInt32();
+		result.iterations = binary_reader_.ReadInt32();
 		result.limit_angle = binary_reader_.ReadSingle();
 		uint ik_link_count = binary_reader_.ReadUInt32();
 		result.ik_link = new PMXFormat.IK_Link[ik_link_count];
@@ -476,24 +476,24 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private uint CastIntRead(BinaryReader bin, PMXFormat.Header.IndexSize index_size)
+	private int CastIntRead(BinaryReader bin, PMXFormat.Header.IndexSize index_size)
 	{
-		uint result = 0;
+		int result = 0;
 		switch(index_size) {
 		case PMXFormat.Header.IndexSize.Byte1:
-			result = (uint)binary_reader_.ReadByte();
+			result = binary_reader_.ReadByte();
 			if (byte.MaxValue == result) {
-				result = uint.MaxValue;
+				result = -1;
 			}
 			break;
 		case PMXFormat.Header.IndexSize.Byte2:
-			result = (uint)binary_reader_.ReadUInt16();
+			result = binary_reader_.ReadUInt16();
 			if (ushort.MaxValue == result) {
-				result = uint.MaxValue;
+				result = -1;
 			}
 			break;
 		case PMXFormat.Header.IndexSize.Byte4:
-			result = binary_reader_.ReadUInt32();
+			result = binary_reader_.ReadInt32();
 			break;
 		default:
 			throw new System.ArgumentOutOfRangeException();

@@ -159,8 +159,8 @@ public partial class PMXLoaderScript {
 			result.toon_index = (byte)pmx_material.toon_texture_index;
 		}
 		result.edge_flag = (byte)((0 != ((int)pmx_material.flag & (int)PMXFormat.Material.Flag.Edge))? 1: 0);
-		result.face_vert_count = pmx_material.face_vert_count;
-		if (uint.MaxValue != pmx_material.sphere_texture_index) {
+		result.face_vert_count = (uint)pmx_material.face_vert_count;
+		if (-1 != pmx_material.sphere_texture_index) {
 			string tex = pmx.textures[pmx_material.sphere_texture_index];
 			result.sphere_map_name = ((0 == tex.IndexOf("./"))? tex.Substring(2): tex); //"./"開始なら除去
 #if MFU_PMX2PMD_SPHERE_MAP_NAME_ADD_EXTENSION_FOR_SPHERE_MODE //スフィアモードの為に、拡張子を付加する(ファイルパスが変更されるのでMMDConverter側で2重拡張子に対応する迄無効化)
@@ -176,7 +176,7 @@ public partial class PMXLoaderScript {
 			}
 #endif
 		}
-		if (uint.MaxValue != pmx_material.usually_texture_index) {
+		if (-1 != pmx_material.usually_texture_index) {
 			string tex = pmx.textures[pmx_material.usually_texture_index];
 			result.texture_file_name = ((0 == tex.IndexOf("./"))? tex.Substring(2): tex); //"./"開始なら除去
 		}
@@ -197,7 +197,7 @@ public partial class PMXLoaderScript {
 		PMDFormat.Bone result = new PMDFormat.Bone();
 		PMXFormat.Bone pmx_bone = pmx.bones[bone_index];
 		result.bone_name = pmx_bone.bone_name;
-		result.parent_bone_index = (ushort)((uint.MaxValue == pmx_bone.parent_bone_index)? ushort.MaxValue: pmx_bone.parent_bone_index);
+		result.parent_bone_index = (ushort)((-1 == pmx_bone.parent_bone_index)? ushort.MaxValue: pmx_bone.parent_bone_index);
 		result.tail_pos_bone_index = ushort.MaxValue;
 #if false
 		//PMD側 0:回転 1:回転と移動 2:IK 3:不明 4:IK影響下 5:回転影響下 6:IK接続先 7:非表示 8:捻り 9:回転運動
@@ -288,7 +288,7 @@ public partial class PMXLoaderScript {
 		switch (pmx_morph.morph_type) {
 		case PMXFormat.MorphData.MorphType.Vertex: //頂点変形モーフなら
 			PMXFormat.VertexMorphOffset vertex_pmx_offset = (PMXFormat.VertexMorphOffset)pmx_offset;
-			result.skin_vert_index = skin_vertex_index_reverse_dictionary[vertex_pmx_offset.vertex_index];
+			result.skin_vert_index = (uint)skin_vertex_index_reverse_dictionary[(uint)vertex_pmx_offset.vertex_index];
 			result.skin_vert_pos = vertex_pmx_offset.position_offset;
 			break;
 		default: //頂点変形モーフ以外なら
@@ -311,7 +311,7 @@ public partial class PMXLoaderScript {
 		all_vertex_index_list.Sort(); //ソート
 		result.skin_vert_data = all_vertex_index_list.Select(x=>{
 																PMDFormat.SkinVertexData skin_vertex_data = new PMDFormat.SkinVertexData();
-																skin_vertex_data.skin_vert_index = x;
+																skin_vertex_data.skin_vert_index = (uint)x;
 																skin_vertex_data.skin_vert_pos = pmx.vertices[x].pos;
 																return skin_vertex_data;
 															}) //頂点インデックスを用いて、元の頂点座標をパック
@@ -438,8 +438,8 @@ public partial class PMXLoaderScript {
 		PMDFormat.Joint result = new PMDFormat.Joint();
 		PMXFormat.Joint pmx_joint = pmx.joints[joint_index];
 		result.joint_name = pmx_joint.name;
-		result.joint_rigidbody_a = pmx_joint.rigidbody_a;
-		result.joint_rigidbody_b = pmx_joint.rigidbody_b;
+		result.joint_rigidbody_a = (uint)pmx_joint.rigidbody_a;
+		result.joint_rigidbody_b = (uint)pmx_joint.rigidbody_b;
 		result.joint_pos = pmx_joint.position;
 		result.joint_rot = pmx_joint.rotation;
 		result.constrain_pos_1 = pmx_joint.constrain_pos_lower;

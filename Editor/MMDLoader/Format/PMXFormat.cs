@@ -78,10 +78,10 @@ namespace MMD {
 			public interface BoneWeight
 			{
 				Vertex.WeightMethod method {get;}
-				uint bone1_ref {get;}
-				uint bone2_ref {get;}
-				uint bone3_ref {get;}
-				uint bone4_ref {get;}
+				Int32 bone1_ref {get;}
+				Int32 bone2_ref {get;}
+				Int32 bone3_ref {get;}
+				Int32 bone4_ref {get;}
 				float bone1_weight {get;}
 				float bone2_weight {get;}
 				float bone3_weight {get;}
@@ -94,10 +94,10 @@ namespace MMD {
 			public class BDEF1 : BoneWeight
 			{
 				public Vertex.WeightMethod method {get{return Vertex.WeightMethod.BDEF1;}}
-				public uint bone1_ref {get; set;}
-				public uint bone2_ref {get{return 0;}}
-				public uint bone3_ref {get{return 0;}}
-				public uint bone4_ref {get{return 0;}}
+				public Int32 bone1_ref {get; set;}
+				public Int32 bone2_ref {get{return 0;}}
+				public Int32 bone3_ref {get{return 0;}}
+				public Int32 bone4_ref {get{return 0;}}
 				public float bone1_weight {get{return 1.0f;}}
 				public float bone2_weight {get{return 0.0f;}}
 				public float bone3_weight {get{return 0.0f;}}
@@ -109,11 +109,11 @@ namespace MMD {
 			public class BDEF2 : BoneWeight
 			{
 				public Vertex.WeightMethod method {get{return Vertex.WeightMethod.BDEF2;}}
-				public uint bone1_ref {get; set;}
-				public uint bone2_ref {get; set;}
+				public Int32 bone1_ref {get; set;}
+				public Int32 bone2_ref {get; set;}
 				public float bone1_weight {get; set;}
-				public uint bone3_ref {get{return 0;}}
-				public uint bone4_ref {get{return 0;}}
+				public Int32 bone3_ref {get{return 0;}}
+				public Int32 bone4_ref {get{return 0;}}
 				public float bone2_weight {get{return 1.0f - bone1_weight;}}
 				public float bone3_weight {get{return 0.0f;}}
 				public float bone4_weight {get{return 0.0f;}}
@@ -124,10 +124,10 @@ namespace MMD {
 			public class BDEF4 : BoneWeight
 			{
 				public Vertex.WeightMethod method {get{return Vertex.WeightMethod.BDEF4;}}
-				public uint bone1_ref {get; set;}
-				public uint bone2_ref {get; set;}
-				public uint bone3_ref {get; set;}
-				public uint bone4_ref {get; set;}
+				public Int32 bone1_ref {get; set;}
+				public Int32 bone2_ref {get; set;}
+				public Int32 bone3_ref {get; set;}
+				public Int32 bone4_ref {get; set;}
 				public float bone1_weight {get; set;}
 				public float bone2_weight {get; set;}
 				public float bone3_weight {get; set;}
@@ -139,14 +139,14 @@ namespace MMD {
 			public class SDEF : BoneWeight
 			{
 				public Vertex.WeightMethod method {get{return Vertex.WeightMethod.SDEF;}}
-				public uint bone1_ref {get; set;}
-				public uint bone2_ref {get; set;}
+				public Int32 bone1_ref {get; set;}
+				public Int32 bone2_ref {get; set;}
 				public float bone1_weight {get; set;}
 				public Vector3 c_value {get; set;}
 				public Vector3 r0_value {get; set;}
 				public Vector3 r1_value {get; set;}
-				public uint bone3_ref {get{return 0;}}
-				public uint bone4_ref {get{return 0;}}
+				public Int32 bone3_ref {get{return 0;}}
+				public Int32 bone4_ref {get{return 0;}}
 				public float bone2_weight {get{return 1.0f - bone1_weight;}}
 				public float bone3_weight {get{return 0.0f;}}
 				public float bone4_weight {get{return 0.0f;}}
@@ -154,10 +154,10 @@ namespace MMD {
 			public class QDEF : BoneWeight
 			{
 				public Vertex.WeightMethod method {get{return Vertex.WeightMethod.QDEF;}}
-				public uint bone1_ref {get; set;}
-				public uint bone2_ref {get; set;}
-				public uint bone3_ref {get; set;}
-				public uint bone4_ref {get; set;}
+				public Int32 bone1_ref {get; set;}
+				public Int32 bone2_ref {get; set;}
+				public Int32 bone3_ref {get; set;}
+				public Int32 bone4_ref {get; set;}
 				public float bone1_weight {get; set;}
 				public float bone2_weight {get; set;}
 				public float bone3_weight {get; set;}
@@ -193,13 +193,13 @@ namespace MMD {
 				public Flag flag;
 				public Color edge_color; // r, g, b, a
 				public float edge_size;
-				public uint usually_texture_index;
-				public uint sphere_texture_index;
+				public Int32 usually_texture_index;
+				public Int32 sphere_texture_index;
 				public SphereMode sphere_mode;
 				public byte common_toon;
-				public uint toon_texture_index;
+				public Int32 toon_texture_index;
 				public string memo;
-				public uint face_vert_count; // 面頂点数 // インデックスに変換する場合は、材質0から順に加算
+				public Int32 face_vert_count; // 面頂点数 // インデックスに変換する場合は、材質0から順に加算
 			}
 
             // ボーンデータ(39bytes/bone)
@@ -224,31 +224,31 @@ namespace MMD {
 				public string bone_name; // ボーン名
 				public string bone_english_name;
 				public Vector3 bone_position;
-				public uint parent_bone_index; // 親ボーン番号(ない場合はuint.MaxValue)
+				public Int32 parent_bone_index; // 親ボーン番号(ない場合はInt32.MaxValue)
 				public int transform_level;
 				public Flag bone_flag;
 				public Vector3 position_offset;
-				public uint connection_index;
-				public uint additional_parent_index;
+				public Int32 connection_index;
+				public Int32 additional_parent_index;
 				public float additional_rate;
 				public Vector3 axis_vector;
 				public Vector3 x_axis_vector;
 				public Vector3 z_axis_vector;
-				public uint key_value;
+				public Int32 key_value;
 				public IK_Data ik_data;
 			}
 
 			public class IK_Data
 			{
-				public uint ik_bone_index; // IKボーン番号
-				public uint iterations; // 再帰演算回数 // IK値1
+				public Int32 ik_bone_index; // IKボーン番号
+				public Int32 iterations; // 再帰演算回数 // IK値1
 				public float limit_angle;
 				public IK_Link[] ik_link;
 			}
 			
 			public class IK_Link
 			{
-				public uint target_bone_index;
+				public Int32 target_bone_index;
 				public byte angle_limit;
 				public Vector3 lower_limit;
 				public Vector3 upper_limit;
@@ -289,17 +289,17 @@ namespace MMD {
 
 			public class VertexMorphOffset : MorphOffset
 			{
-				public uint vertex_index;
+				public Int32 vertex_index;
 				public Vector3 position_offset;
 			}
 			public class UVMorphOffset : MorphOffset
 			{
-				public uint vertex_index;
+				public Int32 vertex_index;
 				public Vector4 uv_offset;
 			}
 			public class BoneMorphOffset : MorphOffset
 			{
-				public uint bone_index;
+				public Int32 bone_index;
 				public Vector3 move_value;
 				public Quaternion rotate_value;
 			}
@@ -309,7 +309,7 @@ namespace MMD {
 					Mul,
 					Add,
 				}
-				public uint material_index;
+				public Int32 material_index;
 				public OffsetMethod offset_method;
 				public Color diffuse;
 				public Color specular;
@@ -323,13 +323,13 @@ namespace MMD {
 			}
 			public class GroupMorphOffset : MorphOffset
 			{
-				public uint morph_index;
+				public Int32 morph_index;
 				public float morph_rate;
 			}
 
 			public class ImpulseMorphOffset : MorphOffset
 			{
-				public uint rigidbody_index;
+				public Int32 rigidbody_index;
 				public byte local_flag;
 				public Vector3 move_velocity;
 				public Vector3 rotation_torque;
@@ -346,7 +346,7 @@ namespace MMD {
 			public class DisplayElement
 			{
 				public byte element_target;
-				public uint element_target_index;
+				public Int32 element_target_index;
 			}
 			
 			/// <summary>
@@ -366,7 +366,7 @@ namespace MMD {
 				}
 				public string name; // 諸データ：名称 ,20byte
 				public string english_name; // 諸データ：名称 ,20byte
-				public uint rel_bone_index;// 諸データ：関連ボーン番号 
+				public Int32 rel_bone_index;// 諸データ：関連ボーン番号 
 				public byte group_index; // 諸データ：グループ 
 				public ushort ignore_collision_group;
 				public ShapeType shape_type;  // 形状：タイプ(0:球、1:箱、2:カプセル)
@@ -389,8 +389,8 @@ namespace MMD {
 				public string name;	// 20byte
 				public string english_name;
 				public OperationType operation_type;
-				public uint rigidbody_a; // 諸データ：剛体A 
-				public uint rigidbody_b; // 諸データ：剛体B 
+				public Int32 rigidbody_a; // 諸データ：剛体A 
+				public Int32 rigidbody_b; // 諸データ：剛体B 
 				public Vector3 position; // 諸データ：位置(x, y, z) // 諸データ：位置合せでも設定可 
 				public Vector3 rotation; // 諸データ：回転(rad(x), rad(y), rad(z)) 
 				public Vector3 constrain_pos_lower; // 制限：移動1(x, y, z) 

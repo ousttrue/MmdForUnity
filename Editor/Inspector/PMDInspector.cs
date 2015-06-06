@@ -3,6 +3,7 @@ using UnityEditor;
 using System.Collections;
 using MMD.PMD;
 using System.IO;
+using System;
 
 namespace MMD
 {
@@ -61,14 +62,21 @@ namespace MMD
                         var obj = (PMDScriptableObject)target;
                         model_agent = new ModelAgent(obj.assetPath);
                     }
-                    model_agent.CreatePrefab(pmd_config.shader_type
-                                            , pmd_config.rigidFlag
-                                            , pmd_config.animation_type
-                                            , pmd_config.use_ik
-                                            , pmd_config.scale
-                                            , pmd_config.is_pmx_base_import
-                                            );
-                    message = "Loading done.";
+                    try
+                    {
+                        message = model_agent.CreatePrefab(pmd_config.shader_type
+                                                , pmd_config.rigidFlag
+                                                , pmd_config.animation_type
+                                                , pmd_config.use_ik
+                                                , pmd_config.scale
+                                                , pmd_config.is_pmx_base_import
+                                                );
+                    }
+                    catch(Exception ex)
+                    {
+                        message = ex.Message;
+                        throw;
+                    }
                 }
             }
             GUILayout.Space(40);

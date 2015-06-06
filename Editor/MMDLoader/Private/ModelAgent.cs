@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
+using System;
 
 namespace MMD {
 	
@@ -36,11 +37,10 @@ namespace MMD {
 		/// <param name='use_ik'>IKを使用するか</param>
 		/// <param name='scale'>スケール</param>
 		/// <param name='is_pmx_base_import'>PMX Baseでインポートするか</param>
-		public void CreatePrefab(PMDConverter.ShaderType shader_type, bool use_rigidbody, PMXConverter.AnimationType animation_type, bool use_ik, float scale, bool is_pmx_base_import) 
+		public string CreatePrefab(PMDConverter.ShaderType shader_type, bool use_rigidbody, PMXConverter.AnimationType animation_type, bool use_ik, float scale, bool is_pmx_base_import) 
         {
             try
             {
-
                 GameObject game_object;
                 string prefab_path;
                 if (is_pmx_base_import)
@@ -104,6 +104,8 @@ namespace MMD {
                 // アセットリストの更新
                 EditorUtility.DisplayProgressBar("CreatePrefab", "AssetDatabase.Refresh...", 3.0f / 3.0f);
                 AssetDatabase.Refresh();
+
+                return "Loading done.";
             }
             finally
             {
