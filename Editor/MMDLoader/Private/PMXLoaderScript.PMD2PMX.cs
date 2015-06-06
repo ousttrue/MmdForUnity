@@ -26,15 +26,24 @@ public partial class PMXLoaderScript {
 		PMXFormat result = new PMXFormat();
 		result.meta_header = CreateMetaHeader(pmd);
 		result.header = ConvertHeader(pmd.head, pmd.eg_head, pmd);
-		result.vertex_list = ConvertVertexList(pmd);
-		result.face_vertex_list = ConvertFaceVertexList(pmd);
-		result.texture_list = ConvertTextureList(pmd);
-		result.materials = ConvertMaterialList(pmd, x=>CreateTextureIndex(ref result.texture_list.texture_file, x)).ToArray();
-		result.bone_list = ConvertBoneList(pmd); 
-		result.morph_list = ConvertMorphList(pmd);
-		result.display_frame_list = ConvertDisplayFrameList(pmd);
-		result.rigidbody_list = ConvertRigidbodyList(pmd);
-		result.rigidbody_joint_list = ConvertRigidbodyJointList(pmd);
+		result.vertices = pmd.vertex_list.vertex.Select(x=>ConvertVertex(x)).ToArray();
+		result.indices = pmd.face_vertex_list.face_vert_index.Select(x=>(int)x).ToArray();
+		result.textures = pmd.toon_texture_list.toon_texture_file.ToArray(); //複製する
+		result.materials = pmd.material_list.material
+            .Select((m, i)=> ConvertMaterial(pmd, i, x=>CreateTextureIndex(ref result.textures, x)))
+            .ToArray();
+		result.bones = pmd.bone_list.bone.Select((_, i)=> ConvertBone(pmd, i)).ToArray();
+        result.morphs = ConvertMorphList(pmd)
+            .ToArray();
+		result.display_frames = pmd.bone_display_list.bone_disp
+            .Select((_, i)=>ConvertDisplayFrame(pmd, i))
+            .ToArray();
+		result.rigidbodies = pmd.rigidbody_list.rigidbody
+            .Select((_, i)=>ConvertRigidbody(pmd, i))
+            .ToArray();
+		result.joints = pmd.rigidbody_joint_list.joint
+            .Select(joint =>ConvertJoint(joint))
+            .ToArray();
 		return result;
 	}
 
@@ -122,12 +131,6 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private static PMXFormat.VertexList ConvertVertexList(PMDFormat pmd) {
-		PMXFormat.VertexList result = new PMXFormat.VertexList();
-		result.vertex = pmd.vertex_list.vertex.Select(x=>ConvertVertex(x)).ToArray();
-		return result;
-	}
-
 	private static PMXFormat.Vertex ConvertVertex(PMDFormat.Vertex pmd_vertex) {
 		PMXFormat.Vertex result = new PMXFormat.Vertex();
 		result.pos = pmd_vertex.pos;
@@ -149,24 +152,6 @@ public partial class PMXLoaderScript {
 		}
 		result.edge_magnification = (float)pmd_vertex.edge_flag;
 		return result;
-	}
-
-	private static PMXFormat.FaceVertexList ConvertFaceVertexList(PMDFormat pmd) {
-		PMXFormat.FaceVertexList result = new PMXFormat.FaceVertexList();
-		result.face_vert_index = pmd.face_vertex_list.face_vert_index.Select(x=>(uint)x).ToArray();
-		return result;
-	}
-	
-	private static PMXFormat.TextureList ConvertTextureList(PMDFormat pmd) {
-		PMXFormat.TextureList result = new PMXFormat.TextureList();
-		result.texture_file = pmd.toon_texture_list.toon_texture_file.ToArray(); //複製する
-		return result;
-	}
-
-	private static IEnumerable<PMXFormat.Material> ConvertMaterialList(PMDFormat pmd, System.Func<string, uint> get_texture_index) {
-		for (int i = 0; i < pmd.material_list.material.Length; i++) {
-			yield return ConvertMaterial(pmd, i, get_texture_index);
-		}
 	}
 	
 	private static PMXFormat.Material ConvertMaterial(PMDFormat pmd, int material_index, System.Func<string, uint> get_texture_index) {
@@ -209,15 +194,6 @@ public partial class PMXLoaderScript {
 		result.toon_texture_index = ((0 < pmd_material.toon_index)? pmd_material.toon_index: uint.MaxValue);
 		result.memo = "";
 		result.face_vert_count = pmd_material.face_vert_count;
-		return result;
-	}
-
-	private static PMXFormat.BoneList ConvertBoneList(PMDFormat pmd) {
-		PMXFormat.BoneList result = new PMXFormat.BoneList();
-		result.bone = new PMXFormat.Bone[pmd.bone_list.bone.Length];
-		for (int i = 0, i_max = pmd.bone_list.bone.Length; i < i_max; ++i) {
-			result.bone[i] = ConvertBone(pmd, i);
-		}
 		return result;
 	}
 
@@ -288,25 +264,22 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 	
-	private static PMXFormat.MorphList ConvertMorphList(PMDFormat pmd) {
-		PMXFormat.MorphList result = new PMXFormat.MorphList();
+	private static IEnumerable<PMXFormat.MorphData> ConvertMorphList(PMDFormat pmd) {
 		//頂点インデックス用辞書の作成
 		PMDFormat.SkinData pmd_skin_data_base = pmd.skin_list.skin_data.Where(x=>0==x.skin_type).First();
 		Dictionary<uint, uint> morph_vertex_index_dictionary = new Dictionary<uint, uint>(pmd_skin_data_base.skin_vert_data.Length);
 		for (uint i = 0, i_max = (uint)pmd_skin_data_base.skin_vert_data.Length; i < i_max; ++i) {
 			morph_vertex_index_dictionary.Add(i, pmd_skin_data_base.skin_vert_data[i].skin_vert_index);
 		}
+
 		//base以外の変換
-		result.morph_data = new PMXFormat.MorphData[pmd.skin_list.skin_data.Where(x=>0!=x.skin_type).Count()]; //base分を除外
-		int morph_data_count = 0;
-		for (int i = 0, i_max = pmd.skin_list.skin_data.Length; i < i_max; ++i) {
+		for (int i = 0; i < pmd.skin_list.skin_data.Where(x=>0!=x.skin_type).Count(); ++i) {
 			if (0 != pmd.skin_list.skin_data[i].skin_type) {
 				//base以外なら
 				string eg_skin_name = (((null != pmd.eg_skin_name_list) && (1 <= i))? pmd.eg_skin_name_list.skin_name_eg[i - 1]: null);
-				result.morph_data[morph_data_count++] = ConvertMorphData(pmd.skin_list.skin_data[i], eg_skin_name, morph_vertex_index_dictionary);
+				yield return ConvertMorphData(pmd.skin_list.skin_data[i], eg_skin_name, morph_vertex_index_dictionary);
 			}
 		}
-		return result;
 	}
 
 	private static PMXFormat.MorphData ConvertMorphData(PMDFormat.SkinData pmd_skin, string pmd_eg_skin_name, Dictionary<uint, uint> morph_vertex_index_dictionary) {
@@ -326,15 +299,6 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private static PMXFormat.DisplayFrameList ConvertDisplayFrameList(PMDFormat pmd) {
-		PMXFormat.DisplayFrameList result = new PMXFormat.DisplayFrameList();
-		result.display_frame = new PMXFormat.DisplayFrame[pmd.bone_display_list.bone_disp.Length];
-		for (int i = 0, i_max = result.display_frame.Length; i < i_max; ++i) {
-			result.display_frame[i] = ConvertDisplayFrame(pmd, i);
-		}
-		return result;
-	}
-
 	private static PMXFormat.DisplayFrame ConvertDisplayFrame(PMDFormat pmd, int bone_display_index) {
 		PMXFormat.DisplayFrame result = new PMXFormat.DisplayFrame();
 		PMDFormat.BoneDisplay pmd_bone_display = pmd.bone_display_list.bone_disp[bone_display_index];
@@ -344,15 +308,6 @@ public partial class PMXLoaderScript {
 		result.display_element = new []{new PMXFormat.DisplayElement()};
 		result.display_element[0].element_target = pmd_bone_display.bone_disp_frame_index;
 		result.display_element[0].element_target_index = pmd_bone_display.bone_index;
-		return result;
-	}
-
-	private static PMXFormat.RigidbodyList ConvertRigidbodyList(PMDFormat pmd) {
-		PMXFormat.RigidbodyList result = new PMXFormat.RigidbodyList();
-		result.rigidbody = new PMXFormat.Rigidbody[pmd.rigidbody_list.rigidbody.Length];
-		for (int i = 0, i_max = result.rigidbody.Length; i < i_max; ++i) {
-			result.rigidbody[i] = ConvertRigidbody(pmd, i);
-		}
 		return result;
 	}
 	
@@ -379,12 +334,6 @@ public partial class PMXLoaderScript {
 		result.recoil = pmd_rigidbody.rigidbody_recoil;
 		result.friction = pmd_rigidbody.rigidbody_friction;
 		result.operation_type = (PMXFormat.Rigidbody.OperationType)pmd_rigidbody.rigidbody_type;
-		return result;
-	}
-	
-	private static PMXFormat.RigidbodyJointList ConvertRigidbodyJointList(PMDFormat pmx) {
-		PMXFormat.RigidbodyJointList result = new PMXFormat.RigidbodyJointList();
-		result.joint = pmx.rigidbody_joint_list.joint.Select(x=>ConvertJoint(x)).ToArray();
 		return result;
 	}
 	

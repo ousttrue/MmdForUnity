@@ -197,9 +197,11 @@ namespace MMD
                                 Submesh pack = new Submesh();
                                 pack.material_index = (uint)x;
                                 uint plane_count = format.materials[x].face_vert_count;
-                                pack.indices = format.face_vertex_list.face_vert_index.Skip((int)plane_start)
-                                                                                                    .Take((int)plane_count)
-                                                                                                    .ToArray();
+                                pack.indices = format.indices
+                                    .Skip((int)plane_start)
+                                    .Take((int)plane_count)
+                                    .Select(i => (uint)i)
+                                    .ToArray();
                                 pack.unique_vertex_count = pack.indices.Distinct().Count(); //重複削除
                                 plane_start += plane_count;
                                 return pack;
@@ -371,17 +373,17 @@ namespace MMD
         /// <param name='creation_info'>メッシュ作成情報</param>
         void EntryAttributesForMesh(UnityEngine.Mesh mesh, MeshCreationInfo creation_info)
         {
-            mesh.vertices = creation_info.all_vertices.Select(x => format_.vertex_list.vertex[x].pos * scale_).ToArray();
-            mesh.normals = creation_info.all_vertices.Select(x => format_.vertex_list.vertex[x].normal_vec).ToArray();
-            mesh.uv = creation_info.all_vertices.Select(x => format_.vertex_list.vertex[x].uv).ToArray();
+            mesh.vertices = creation_info.all_vertices.Select(x => format_.vertices[x].pos * scale_).ToArray();
+            mesh.normals = creation_info.all_vertices.Select(x => format_.vertices[x].normal_vec).ToArray();
+            mesh.uv = creation_info.all_vertices.Select(x => format_.vertices[x].uv).ToArray();
             if (0 < format_.header.additionalUV)
             {
                 //追加UVが1つ以上有れば
                 //1つ目のみ登録
-                mesh.uv2 = creation_info.all_vertices.Select(x => new UnityEngine.Vector2(format_.vertex_list.vertex[x].add_uv[0].x, format_.vertex_list.vertex[x].add_uv[0].y)).ToArray();
+                mesh.uv2 = creation_info.all_vertices.Select(x => new UnityEngine.Vector2(format_.vertices[x].add_uv[0].x, format_.vertices[x].add_uv[0].y)).ToArray();
             }
-            mesh.boneWeights = creation_info.all_vertices.Select(x => ConvertBoneWeight(format_.vertex_list.vertex[x].bone_weight)).ToArray();
-            mesh.colors = creation_info.all_vertices.Select(x => new UnityEngine.Color(0.0f, 0.0f, 0.0f, format_.vertex_list.vertex[x].edge_magnification * 0.25f)).ToArray(); //不透明度にエッジ倍率を0.25倍した情報を仕込む(0～8迄は表せる)
+            mesh.boneWeights = creation_info.all_vertices.Select(x => ConvertBoneWeight(format_.vertices[x].bone_weight)).ToArray();
+            mesh.colors = creation_info.all_vertices.Select(x => new UnityEngine.Color(0.0f, 0.0f, 0.0f, format_.vertices[x].edge_magnification * 0.25f)).ToArray(); //不透明度にエッジ倍率を0.25倍した情報を仕込む(0～8迄は表せる)
         }
 
         /// <summary>
@@ -435,7 +437,7 @@ namespace MMD
             mesh.subMeshCount = creation_info.submeshes.Length;
             for (int i = 0, i_max = creation_info.submeshes.Length; i < i_max; ++i)
             {
-                //format_.face_vertex_list.face_vert_indexを[start](含む)から[start+count](含まず)迄取り出し
+                //format_.indicesを[start](含む)から[start+count](含まず)迄取り出し
                 int[] indices = creation_info.submeshes[i].indices.Select(x => (int)creation_info.reassign_dictionary[x]) //頂点リアサインインデックス変換
                                                                     .ToArray();
                 mesh.SetTriangles(indices, i);
@@ -531,7 +533,7 @@ namespace MMD
         {
             bool[] result = Enumerable.Repeat(false, format_.materials.Length)
                                         .ToArray();
-            var transparent_material_indices = format_.morph_list.morph_data.Where(x => PMXFormat.MorphData.MorphType.Material == x.morph_type) //材質モーフなら
+            var transparent_material_indices = format_.morphs.Where(x => PMXFormat.MorphData.MorphType.Material == x.morph_type) //材質モーフなら
                                                                             .SelectMany(x => x.morph_offset) //材質モーフオフセット取得
                                                                             .Select(x => (PMXFormat.MaterialMorphOffset)x) //材質モーフオフセットにキャスト
                                                                             .Where(x => (PMXFormat.MaterialMorphOffset.OffsetMethod.Mul == x.offset_method) && ((x.diffuse.a < 1.0f) || (x.edge_color.a < 1.0f))) //拡散色かエッジ色が透過に為るなら
@@ -581,7 +583,7 @@ namespace MMD
         UnityEngine.Texture2D[] GetTextureList()
         {
             string[] texture_path = format_.materials.Select(x => x.usually_texture_index) //材質が使用しているテクスチャインデックスを取得
-                                                                    .Select(x => ((x < format_.texture_list.texture_file.Length) ? format_.texture_list.texture_file[x] : null)) //有効なテクスチャインデックスならパスの取得
+                                                                    .Select(x => ((x < format_.textures.Length) ? format_.textures[x] : null)) //有効なテクスチャインデックスならパスの取得
                                                                     .ToArray();
             alpha_readable_texture_ = new AlphaReadableTexture(texture_path
                                                             , format_.meta_header.folder + "/"
@@ -603,14 +605,14 @@ namespace MMD
         {
             var vertex_list = CreateMeshCreationInfoPacks(format_).Select(x => x.indices).ToArray();
 
-            var uv_morphs = format_.morph_list.morph_data
+            var uv_morphs = format_.morphs
                                                             .Where(x => PMXFormat.MorphData.MorphType.Uv == x.morph_type) //UVモーフなら
                                                             .Select(x => x.morph_offset.Select(y => (PMXFormat.UVMorphOffset)y)
                                                                                     .ToDictionary(z => z.vertex_index, z => z.uv_offset) //頂点インデックスでディクショナリ化
                                                                     ) //UVモーフオフセット取得
                                                             .ToArray();
 
-            var uv_list = vertex_list.Select(x => x.Select(y => format_.vertex_list.vertex[y].uv).ToList()).ToArray();
+            var uv_list = vertex_list.Select(x => x.Select(y => format_.vertices[y].uv).ToList()).ToArray();
 
             //材質走査
             bool is_cancel = false;
@@ -628,7 +630,7 @@ namespace MMD
                                                                                 + format_.materials[material_index].name
                                                                                 + "\t"
                                                                                 + "UV Morph:[" + uv_morph_index + "|" + uv_morph_index_max + "]"
-                                                                                + format_.morph_list.morph_data.Where(x => PMXFormat.MorphData.MorphType.Uv == x.morph_type).Skip(uv_morph_index).First().morph_name
+                                                                                + format_.morphs.Where(x => PMXFormat.MorphData.MorphType.Uv == x.morph_type).Skip(uv_morph_index).First().morph_name
                                                                             , ((((float)uv_morph_index / (float)uv_morph_index_max) + (float)material_index) / (float)material_index_max)
                                                                             );
                     if (is_cancel)
@@ -656,7 +658,7 @@ namespace MMD
                                 //適応したUV値を作成
                                 var tri_uv = tri_vertices.Select(x => new
                                 {
-                                    original_uv = format_.vertex_list.vertex[x].uv
+                                    original_uv = format_.vertices[x].uv
                                  ,
                                     add_uv = ((uv_morph.ContainsKey(x)) ? uv_morph[x] : UnityEngine.Vector4.zero)
                                 }
@@ -783,9 +785,9 @@ namespace MMD
 
             //先にテクスチャ情報を検索
             UnityEngine.Texture2D main_texture = null;
-            if (material.usually_texture_index < format_.texture_list.texture_file.Length)
+            if (material.usually_texture_index < format_.textures.Length)
             {
-                string texture_file_name = format_.texture_list.texture_file[material.usually_texture_index];
+                string texture_file_name = format_.textures[material.usually_texture_index];
                 string path = format_.meta_header.folder + "/" + texture_file_name;
                 main_texture = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(path);
             }
@@ -821,9 +823,9 @@ namespace MMD
             }
 
             // スフィアテクスチャ
-            if (material.sphere_texture_index < format_.texture_list.texture_file.Length)
+            if (material.sphere_texture_index < format_.textures.Length)
             {
-                string sphere_texture_file_name = format_.texture_list.texture_file[material.sphere_texture_index];
+                string sphere_texture_file_name = format_.textures[material.sphere_texture_index];
                 string path = format_.meta_header.folder + "/" + sphere_texture_file_name;
                 var sphere_texture = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(path);
 
@@ -855,10 +857,10 @@ namespace MMD
                     //共通トゥーン
                     toon_texture_name = "toon" + material.common_toon.ToString("00") + ".bmp";
                 }
-                else if (material.toon_texture_index < format_.texture_list.texture_file.Length)
+                else if (material.toon_texture_index < format_.textures.Length)
                 {
                     //自前トゥーン
-                    toon_texture_name = format_.texture_list.texture_file[material.toon_texture_index];
+                    toon_texture_name = format_.textures[material.toon_texture_index];
                 }
                 if (!string.IsNullOrEmpty(toon_texture_name))
                 {
@@ -1043,7 +1045,7 @@ namespace MMD
         /// <returns>ボーンのゲームオブジェクト</returns>
         UnityEngine.GameObject[] EntryAttributeForBones()
         {
-            return format_.bone_list.bone.Select(x =>
+            return format_.bones.Select(x =>
             {
                 var game_object = new UnityEngine.GameObject(x.bone_name);
                 game_object.transform.position = x.bone_position * scale_;
@@ -1061,9 +1063,9 @@ namespace MMD
             var model_root_transform = (new UnityEngine.GameObject("Model")).transform;
             model_root_transform.parent = root_game_object_.transform;
 
-            for (int i = 0, i_max = format_.bone_list.bone.Length; i < i_max; ++i)
+            for (int i = 0, i_max = format_.bones.Length; i < i_max; ++i)
             {
-                uint parent_bone_index = format_.bone_list.bone[i].parent_bone_index;
+                uint parent_bone_index = format_.bones[i].parent_bone_index;
                 if (parent_bone_index < (uint)bones.Length)
                 {
                     //親のボーンが有るなら
@@ -1099,10 +1101,10 @@ namespace MMD
             morph_manager.uv_morph = new MorphManager.UvMorphPack[1 + format_.header.additionalUV]; //UVモーフ数設定
 
             //個別モーフスクリプト作成
-            var morphs = new UnityEngine.GameObject[format_.morph_list.morph_data.Length];
-            for (int i = 0, i_max = format_.morph_list.morph_data.Length; i < i_max; ++i)
+            var morphs = new UnityEngine.GameObject[format_.morphs.Length];
+            for (int i = 0, i_max = format_.morphs.Length; i < i_max; ++i)
             {
-                morphs[i] = new UnityEngine.GameObject(format_.morph_list.morph_data[i].morph_name);
+                morphs[i] = new UnityEngine.GameObject(format_.morphs[i].morph_name);
                 // 表情を親ボーンに付ける
                 morphs[i].transform.parent = expression_root_transform;
             }
@@ -1135,7 +1137,7 @@ namespace MMD
         void CreateGroupMorph(MorphManager morph_manager, UnityEngine.GameObject[] morphs)
         {
             //インデックスと元データの作成
-            List<uint> original_indices = format_.morph_list.morph_data.Where(x => (PMXFormat.MorphData.MorphType.Group == x.morph_type)) //該当モーフに絞る
+            List<uint> original_indices = format_.morphs.Where(x => (PMXFormat.MorphData.MorphType.Group == x.morph_type)) //該当モーフに絞る
                                                                         .SelectMany(x => x.morph_offset.Select(y => ((PMXFormat.GroupMorphOffset)y).morph_index)) //インデックスの取り出しと連結
                                                                         .Distinct() //重複したインデックスの削除
                                                                         .ToList(); //ソートに向けて一旦リスト化
@@ -1152,9 +1154,9 @@ namespace MMD
             }
 
             //個別モーフスクリプトの作成
-            GroupMorph[] script = Enumerable.Range(0, format_.morph_list.morph_data.Length)
-                                            .Where(x => PMXFormat.MorphData.MorphType.Group == format_.morph_list.morph_data[x].morph_type) //該当モーフに絞る
-                                            .Select(x => AssignGroupMorph(morphs[x], format_.morph_list.morph_data[x], index_reverse_dictionary))
+            GroupMorph[] script = Enumerable.Range(0, format_.morphs.Length)
+                                            .Where(x => PMXFormat.MorphData.MorphType.Group == format_.morphs[x].morph_type) //該当モーフに絞る
+                                            .Select(x => AssignGroupMorph(morphs[x], format_.morphs[x], index_reverse_dictionary))
                                             .ToArray();
 
             //表情マネージャーにインデックス・元データ・スクリプトの設定
@@ -1187,22 +1189,22 @@ namespace MMD
         void CreateBoneMorph(MorphManager morph_manager, UnityEngine.GameObject[] morphs)
         {
             //インデックスと元データの作成
-            List<uint> original_indices = format_.morph_list.morph_data.Where(x => (PMXFormat.MorphData.MorphType.Bone == x.morph_type)) //該当モーフに絞る
+            List<uint> original_indices = format_.morphs.Where(x => (PMXFormat.MorphData.MorphType.Bone == x.morph_type)) //該当モーフに絞る
                                                                         .SelectMany(x => x.morph_offset.Select(y => ((PMXFormat.BoneMorphOffset)y).bone_index)) //インデックスの取り出しと連結
                                                                         .Distinct() //重複したインデックスの削除
                                                                         .ToList(); //ソートに向けて一旦リスト化
             original_indices.Sort(); //ソート
             int[] indices = original_indices.Select(x => (int)x).ToArray();
-            BoneMorph.BoneMorphParameter[] source = indices.Where(x => x < format_.bone_list.bone.Length)
+            BoneMorph.BoneMorphParameter[] source = indices.Where(x => x < format_.bones.Length)
                                                             .Select(x =>
                                                             {  //インデックスを用いて、元データをパック
-                                                                PMXFormat.Bone y = format_.bone_list.bone[x];
+                                                                PMXFormat.Bone y = format_.bones[x];
                                                                 BoneMorph.BoneMorphParameter result = new BoneMorph.BoneMorphParameter();
                                                                 result.position = y.bone_position;
-                                                                if (y.parent_bone_index < (uint)format_.bone_list.bone.Length)
+                                                                if (y.parent_bone_index < (uint)format_.bones.Length)
                                                                 {
                                                                     //親が居たらローカル座標化
-                                                                    result.position -= format_.bone_list.bone[y.parent_bone_index].bone_position;
+                                                                    result.position -= format_.bones[y.parent_bone_index].bone_position;
                                                                 }
                                                                 result.position *= scale_;
                                                                 result.rotation = UnityEngine.Quaternion.identity;
@@ -1218,9 +1220,9 @@ namespace MMD
             }
 
             //個別モーフスクリプトの作成
-            BoneMorph[] script = Enumerable.Range(0, format_.morph_list.morph_data.Length)
-                                            .Where(x => PMXFormat.MorphData.MorphType.Bone == format_.morph_list.morph_data[x].morph_type) //該当モーフに絞る
-                                            .Select(x => AssignBoneMorph(morphs[x], format_.morph_list.morph_data[x], index_reverse_dictionary))
+            BoneMorph[] script = Enumerable.Range(0, format_.morphs.Length)
+                                            .Where(x => PMXFormat.MorphData.MorphType.Bone == format_.morphs[x].morph_type) //該当モーフに絞る
+                                            .Select(x => AssignBoneMorph(morphs[x], format_.morphs[x], index_reverse_dictionary))
                                             .ToArray();
 
             //表情マネージャーにインデックス・元データ・スクリプトの設定
@@ -1262,13 +1264,13 @@ namespace MMD
         void CreateVertexMorph(MorphManager morph_manager, UnityEngine.GameObject[] morphs, MeshCreationInfo[] creation_info)
         {
             //インデックスと元データの作成
-            List<uint> original_indices = format_.morph_list.morph_data.Where(x => (PMXFormat.MorphData.MorphType.Vertex == x.morph_type)) //該当モーフに絞る
+            List<uint> original_indices = format_.morphs.Where(x => (PMXFormat.MorphData.MorphType.Vertex == x.morph_type)) //該当モーフに絞る
                                                                         .SelectMany(x => x.morph_offset.Select(y => ((PMXFormat.VertexMorphOffset)y).vertex_index)) //インデックスの取り出しと連結
                                                                         .Distinct() //重複したインデックスの削除
                                                                         .ToList(); //ソートに向けて一旦リスト化
             original_indices.Sort(); //ソート
             int[] indices = original_indices.Select(x => (int)x).ToArray();
-            var source = indices.Select(x => format_.vertex_list.vertex[x].pos * scale_) //インデックスを用いて、元データをパック
+            var source = indices.Select(x => format_.vertices[x].pos * scale_) //インデックスを用いて、元データをパック
                                     .ToArray();
 
             //インデックス逆引き用辞書の作成
@@ -1279,13 +1281,13 @@ namespace MMD
             }
 
             //個別モーフスクリプトの作成
-            VertexMorph[] script = Enumerable.Range(0, format_.morph_list.morph_data.Length)
-                                            .Where(x => PMXFormat.MorphData.MorphType.Vertex == format_.morph_list.morph_data[x].morph_type) //該当モーフに絞る
-                                            .Select(x => AssignVertexMorph(morphs[x], format_.morph_list.morph_data[x], index_reverse_dictionary))
+            VertexMorph[] script = Enumerable.Range(0, format_.morphs.Length)
+                                            .Where(x => PMXFormat.MorphData.MorphType.Vertex == format_.morphs[x].morph_type) //該当モーフに絞る
+                                            .Select(x => AssignVertexMorph(morphs[x], format_.morphs[x], index_reverse_dictionary))
                                             .ToArray();
 
             //メッシュ別インデックスの作成
-            int invalid_vertex_index = format_.vertex_list.vertex.Length;
+            int invalid_vertex_index = format_.vertices.Length;
             MorphManager.VertexMorphPack.Meshes[] multi_indices = new MorphManager.VertexMorphPack.Meshes[creation_info.Length];
             for (int i = 0, i_max = creation_info.Length; i < i_max; ++i)
             {
@@ -1351,7 +1353,7 @@ namespace MMD
                 }
 
                 //インデックスと元データの作成
-                List<uint> original_indices = format_.morph_list.morph_data.Where(x => (morph_type == x.morph_type)) //該当モーフに絞る
+                List<uint> original_indices = format_.morphs.Where(x => (morph_type == x.morph_type)) //該当モーフに絞る
                                                                             .SelectMany(x => x.morph_offset.Select(y => ((PMXFormat.UVMorphOffset)y).vertex_index)) //インデックスの取り出しと連結
                                                                             .Distinct() //重複したインデックスの削除
                                                                             .ToList(); //ソートに向けて一旦リスト化
@@ -1361,14 +1363,14 @@ namespace MMD
                 if (0 == morph_type_index)
                 {
                     //通常UV
-                    source = indices.Select(x => format_.vertex_list.vertex[x].uv) //インデックスを用いて、元データをパック
+                    source = indices.Select(x => format_.vertices[x].uv) //インデックスを用いて、元データをパック
                                     .Select(x => new UnityEngine.Vector2(x.x, x.y))
                                     .ToArray();
                 }
                 else
                 {
                     //追加UV
-                    source = indices.Select(x => format_.vertex_list.vertex[x].add_uv[morph_type_index - 1]) //インデックスを用いて、元データをパック
+                    source = indices.Select(x => format_.vertices[x].add_uv[morph_type_index - 1]) //インデックスを用いて、元データをパック
                                     .Select(x => new UnityEngine.Vector2(x.x, x.y))
                                     .ToArray();
                 }
@@ -1381,13 +1383,13 @@ namespace MMD
                 }
 
                 //個別モーフスクリプトの作成
-                UvMorph[] script = Enumerable.Range(0, format_.morph_list.morph_data.Length)
-                                            .Where(x => morph_type == format_.morph_list.morph_data[x].morph_type) //該当モーフに絞る
-                                            .Select(x => AssignUvMorph(morphs[x], format_.morph_list.morph_data[x], index_reverse_dictionary))
+                UvMorph[] script = Enumerable.Range(0, format_.morphs.Length)
+                                            .Where(x => morph_type == format_.morphs[x].morph_type) //該当モーフに絞る
+                                            .Select(x => AssignUvMorph(morphs[x], format_.morphs[x], index_reverse_dictionary))
                                             .ToArray();
 
                 //メッシュ別インデックスの作成
-                int invalid_vertex_index = format_.vertex_list.vertex.Length;
+                int invalid_vertex_index = format_.vertices.Length;
                 MorphManager.UvMorphPack.Meshes[] multi_indices = new MorphManager.UvMorphPack.Meshes[creation_info.Length];
                 for (int i = 0, i_max = creation_info.Length; i < i_max; ++i)
                 {
@@ -1442,7 +1444,7 @@ namespace MMD
         void CreateMaterialMorph(MorphManager morph_manager, UnityEngine.GameObject[] morphs, MeshCreationInfo[] creation_info)
         {
             //インデックスと元データの作成
-            List<uint> original_indices = format_.morph_list.morph_data.Where(x => (PMXFormat.MorphData.MorphType.Material == x.morph_type)) //該当モーフに絞る
+            List<uint> original_indices = format_.morphs.Where(x => (PMXFormat.MorphData.MorphType.Material == x.morph_type)) //該当モーフに絞る
                                                                         .SelectMany(x => x.morph_offset.Select(y => ((PMXFormat.MaterialMorphOffset)y).material_index)) //インデックスの取り出しと連結
                                                                         .Distinct() //重複したインデックスの削除
                                                                         .ToList(); //ソートに向けて一旦リスト化
@@ -1491,9 +1493,9 @@ namespace MMD
             }
 
             //個別モーフスクリプトの作成
-            MaterialMorph[] script = Enumerable.Range(0, format_.morph_list.morph_data.Length)
-                                                .Where(x => PMXFormat.MorphData.MorphType.Material == format_.morph_list.morph_data[x].morph_type) //該当モーフに絞る
-                                                .Select(x => AssignMaterialMorph(morphs[x], format_.morph_list.morph_data[x], index_reverse_dictionary))
+            MaterialMorph[] script = Enumerable.Range(0, format_.morphs.Length)
+                                                .Where(x => PMXFormat.MorphData.MorphType.Material == format_.morphs[x].morph_type) //該当モーフに絞る
+                                                .Select(x => AssignMaterialMorph(morphs[x], format_.morphs[x], index_reverse_dictionary))
                                                 .ToArray();
 
             //材質リアサイン辞書の作成
@@ -1623,10 +1625,10 @@ namespace MMD
             {
                 bone.AddComponent<BoneController>();
             }
-            BoneController[] result = Enumerable.Range(0, format_.bone_list.bone.Length)
-                                                .OrderBy(x => (int)(PMXFormat.Bone.Flag.PhysicsTransform & format_.bone_list.bone[x].bone_flag)) //物理後変形を後方へ
-                                                .ThenBy(x => format_.bone_list.bone[x].transform_level) //変形階層で安定ソート
-                                                .Select(x => ConvertBoneController(format_.bone_list.bone[x], x, bones)) //ConvertIk()を呼び出す
+            BoneController[] result = Enumerable.Range(0, format_.bones.Length)
+                                                .OrderBy(x => (int)(PMXFormat.Bone.Flag.PhysicsTransform & format_.bones[x].bone_flag)) //物理後変形を後方へ
+                                                .ThenBy(x => format_.bones[x].transform_level) //変形階層で安定ソート
+                                                .Select(x => ConvertBoneController(format_.bones[x], x, bones)) //ConvertIk()を呼び出す
                                                 .ToArray();
             return result;
         }
@@ -1670,7 +1672,7 @@ namespace MMD
                     //IK制御先のボーンについて、物理演算の挙動を調べる
                     var operation_types = Enumerable.Repeat(bone.ik_data.ik_bone_index, 1) //IK対象先をEnumerable化
                                                     .Concat(bone.ik_data.ik_link.Select(x => x.target_bone_index)) //IK制御下を追加
-                                                    .Join(format_.rigidbody_list.rigidbody, x => x, y => y.rel_bone_index, (x, y) => y.operation_type); //剛体リストから関連ボーンにIK対象先・IK制御下と同じボーンを持つ物を列挙し、剛体タイプを返す
+                                                    .Join(format_.rigidbodies, x => x, y => y.rel_bone_index, (x, y) => y.operation_type); //剛体リストから関連ボーンにIK対象先・IK制御下と同じボーンを持つ物を列挙し、剛体タイプを返す
                     foreach (var operation_type in operation_types)
                     {
                         if (PMXFormat.Rigidbody.OperationType.Static != operation_type)
@@ -1698,11 +1700,11 @@ namespace MMD
             }
 
             // 剛体の登録
-            var result = format_.rigidbody_list.rigidbody.Select(x => ConvertRigidbody(x)).ToArray();
+            var result = format_.rigidbodies.Select(x => ConvertRigidbody(x)).ToArray();
             for (uint i = 0, i_max = (uint)result.Length; i < i_max; ++i)
             {
                 // マテリアルの設定
-                result[i].GetComponent<UnityEngine.Collider>().material = CreatePhysicMaterial(format_.rigidbody_list.rigidbody, i);
+                result[i].GetComponent<UnityEngine.Collider>().material = CreatePhysicMaterial(format_.rigidbodies, i);
 
             }
 
@@ -1833,9 +1835,9 @@ namespace MMD
         /// <param name='rigids'>剛体のゲームオブジェクト</param>
         uint GetRelBoneIndexFromNearbyRigidbody(uint rigidbody_index)
         {
-            uint bone_count = (uint)format_.bone_list.bone.Length;
+            uint bone_count = (uint)format_.bones.Length;
             //関連ボーンを探す
-            uint result = format_.rigidbody_list.rigidbody[rigidbody_index].rel_bone_index;
+            uint result = format_.rigidbodies[rigidbody_index].rel_bone_index;
             if (result < bone_count)
             {
                 //関連ボーンが有れば
@@ -1846,7 +1848,7 @@ namespace MMD
             //HACK: 深さ優先探索に為っているけれど、関連ボーンとの類似性を考えれば幅優先探索の方が良いと思われる
 
             //ジョイントのAを探しに行く(自身はBに接続されている)
-            var joint_a_list = format_.rigidbody_joint_list.joint.Where(x => x.rigidbody_b == rigidbody_index) //自身がBに接続されているジョイントに絞る
+            var joint_a_list = format_.joints.Where(x => x.rigidbody_b == rigidbody_index) //自身がBに接続されているジョイントに絞る
                                                                 .Where(x => x.rigidbody_a < bone_count) //Aが有効な剛体に縛る
                                                                 .Select(x => x.rigidbody_a); //Aを返す
             foreach (var joint_a in joint_a_list)
@@ -1860,7 +1862,7 @@ namespace MMD
             }
             //ジョイントのAに無ければ
             //ジョイントのBを探しに行く(自身はAに接続されている)
-            var joint_b_list = format_.rigidbody_joint_list.joint.Where(x => x.rigidbody_a == rigidbody_index) //自身がAに接続されているジョイントに絞る
+            var joint_b_list = format_.joints.Where(x => x.rigidbody_a == rigidbody_index) //自身がAに接続されているジョイントに絞る
                                                                 .Where(x => x.rigidbody_b < bone_count) //Bが有効な剛体に縛る
                                                                 .Select(x => x.rigidbody_b); //Bを返す
             foreach (var joint_b in joint_b_list)
@@ -1885,10 +1887,10 @@ namespace MMD
         /// <param name='rigids'>剛体のゲームオブジェクト</param>
         void SetRigidsSettings(UnityEngine.GameObject[] bones, UnityEngine.GameObject[] rigid)
         {
-            uint bone_count = (uint)format_.bone_list.bone.Length;
-            for (uint i = 0, i_max = (uint)format_.rigidbody_list.rigidbody.Length; i < i_max; ++i)
+            uint bone_count = (uint)format_.bones.Length;
+            for (uint i = 0, i_max = (uint)format_.rigidbodies.Length; i < i_max; ++i)
             {
-                PMXFormat.Rigidbody rigidbody = format_.rigidbody_list.rigidbody[i];
+                PMXFormat.Rigidbody rigidbody = format_.rigidbodies[i];
                 UnityEngine.GameObject target;
                 if (rigidbody.rel_bone_index < bone_count)
                 {
@@ -1957,7 +1959,7 @@ namespace MMD
         UnityEngine.GameObject[] SetupConfigurableJoint(UnityEngine.GameObject[] rigids)
         {
             var result_list = new List<UnityEngine.GameObject>();
-            foreach (PMXFormat.Joint joint in format_.rigidbody_joint_list.joint)
+            foreach (PMXFormat.Joint joint in format_.joints)
             {
                 //相互接続する剛体の取得
                 var transform_a = rigids[joint.rigidbody_a].transform;
@@ -2170,9 +2172,9 @@ namespace MMD
             }
 
             // それぞれの剛体が所属している非衝突グループを追加していく
-            for (int i = 0, i_max = format_.rigidbody_list.rigidbody.Length; i < i_max; ++i)
+            for (int i = 0, i_max = format_.rigidbodies.Length; i < i_max; ++i)
             {
-                result[format_.rigidbody_list.rigidbody[i].group_index].Add(i);
+                result[format_.rigidbodies[i].group_index].Add(i);
             }
             return result;
         }
@@ -2184,7 +2186,7 @@ namespace MMD
         /// <param name='rigids'>剛体のゲームオブジェクト</param>
         int[] GetRigidbodyGroupTargets(UnityEngine.GameObject[] rigids)
         {
-            return format_.rigidbody_list.rigidbody.Select(x => (int)x.ignore_collision_group).ToArray();
+            return format_.rigidbodies.Select(x => (int)x.ignore_collision_group).ToArray();
         }
 
         /// <summary>

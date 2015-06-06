@@ -18,15 +18,15 @@ namespace MMD
 		{
 			public MetaHeader meta_header;
 			public Header header;
-			public VertexList vertex_list;
-			public FaceVertexList face_vertex_list;
-			public TextureList texture_list;
+			public Vertex[] vertices;
+			public Int32[] indices;
+			public String[] textures;
 			public Material[] materials;
-			public BoneList bone_list;
-			public MorphList morph_list;
-			public DisplayFrameList display_frame_list;
-			public RigidbodyList rigidbody_list;
-			public RigidbodyJointList rigidbody_joint_list;
+			public Bone[] bones;
+			public MorphData[] morphs;
+			public DisplayFrame[] display_frames;
+			public Rigidbody[] rigidbodies;
+			public Joint[] joints;
 
 			public class MetaHeader
 			{
@@ -65,11 +65,7 @@ namespace MMD
 				public string english_comment;
 			}
 
-			public class VertexList
-			{
-				public Vertex[] vertex;  // 頂点データ(38bytes/頂点)
-			}
-
+            // 頂点データ(38bytes/頂点)
 			public class Vertex
 			{
 				public enum WeightMethod {
@@ -180,17 +176,6 @@ namespace MMD
 				public Vector3 r1_value {get{return Vector3.zero;}}
 			}
 
-			// 面頂点リスト
-			public class FaceVertexList
-			{
-				public uint[] face_vert_index; // 頂点番号(3個/面)
-			}
-
-			public class TextureList
-			{
-				public string[] texture_file;	// 100byte * 10個固定 
-			}
-
 			public class Material
 			{
 				[Flags]
@@ -226,11 +211,7 @@ namespace MMD
 				public uint face_vert_count; // 面頂点数 // インデックスに変換する場合は、材質0から順に加算
 			}
 
-			public class BoneList
-			{
-				public Bone[] bone; // ボーンデータ(39bytes/bone)
-			}
-
+            // ボーンデータ(39bytes/bone)
 			public class Bone
 			{
 				[Flags]
@@ -282,11 +263,7 @@ namespace MMD
 				public Vector3 upper_limit;
 			}
 			
-			public class MorphList
-			{
-				public MorphData[] morph_data; // 表情データ((25+16*skin_vert_count)/skin)
-			}
-
+            // 表情データ((25+16*skin_vert_count)/skin)
 			public class MorphData
 			{
 				public enum Panel {
@@ -366,11 +343,6 @@ namespace MMD
 				public Vector3 move_velocity;
 				public Vector3 rotation_torque;
 			}
-
-			public class DisplayFrameList
-			{
-				public DisplayFrame[] display_frame;
-			}
 			
 			public class DisplayFrame
 			{
@@ -384,11 +356,6 @@ namespace MMD
 			{
 				public byte element_target;
 				public uint element_target_index;
-			}
-			
-			public class RigidbodyList
-			{
-				public PMX.PMXFormat.Rigidbody[] rigidbody;
 			}
 			
 			/// <summary>
@@ -421,11 +388,6 @@ namespace MMD
 				public float recoil; // 諸データ：反発力 // 00 00 00 00
 				public float friction; // 諸データ：摩擦力 // 00 00 00 00
 				public OperationType operation_type; // 諸データ：タイプ(0:Bone追従、1:物理演算、2:物理演算(Bone位置合せ)) // 00 // Bone追従
-			}
-			
-			public class RigidbodyJointList
-			{
-				public MMD.PMX.PMXFormat.Joint[] joint;
 			}
 			
 			public class Joint

@@ -62,15 +62,42 @@ public partial class PMXLoaderScript {
 		format_ = new PMXFormat();
 		format_.meta_header = CreateMetaHeader();
 		format_.header = ReadHeader();
-		format_.vertex_list = ReadVertexList();
-		format_.face_vertex_list = ReadFaceVertexList();
-		format_.texture_list = ReadTextureList();
-		format_.materials = ReadMaterialList().ToArray();
-		format_.bone_list = ReadBoneList(); 
-		format_.morph_list = ReadMorphList();
-		format_.display_frame_list = ReadDisplayFrameList();
-		format_.rigidbody_list = ReadRigidbodyList();
-		format_.rigidbody_joint_list = ReadRigidbodyJointList();
+        format_.vertices = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_ => ReadVertex())
+            .ToArray();
+		format_.indices = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_ => (int)CastIntRead(binary_reader_, format_.header.vertexIndexSize))
+            .ToArray();
+		format_.textures = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_ =>ReadString())
+            .Select(file =>{
+			    //"./"開始なら削除する
+			    if (('.' == file[0]) && (1 == file.IndexOfAny(new[]{'/', '\\'}, 1, 1))) {
+				    return file.Substring(2);
+			    }
+                else{
+                    return file;
+                }
+            })
+            .ToArray();
+		format_.materials = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_ => ReadMaterial())
+            .ToArray();
+		format_.bones = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_ => ReadBone())
+            .ToArray();
+		format_.morphs = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_ => ReadMorphData())
+            .ToArray();
+		format_.display_frames = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_ =>ReadDisplayFrame())
+            .ToArray();
+		format_.rigidbodies = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_=>ReadRigidbody())
+            .ToArray();
+		format_.joints = Enumerable.Range(0, binary_reader_.ReadInt32())
+            .Select(_=>ReadJoint())
+            .ToArray();
 		return format_;
 	}
 
@@ -105,16 +132,6 @@ public partial class PMXLoaderScript {
 		result.comment = ReadString();
 		result.english_comment = ReadString();
 
-		return result;
-	}
-
-	private PMXFormat.VertexList ReadVertexList() {
-		PMXFormat.VertexList result = new PMXFormat.VertexList();
-		uint vert_count = binary_reader_.ReadUInt32();
-		result.vertex = new PMXFormat.Vertex[vert_count];
-		for (uint i = 0, i_max = (uint)result.vertex.Length; i < i_max; ++i) {
-			result.vertex[i] = ReadVertex();
-		}
 		return result;
 	}
 
@@ -199,38 +216,6 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 	
-	private PMXFormat.FaceVertexList ReadFaceVertexList() {
-		PMXFormat.FaceVertexList result = new PMXFormat.FaceVertexList();
-		uint face_vert_count = binary_reader_.ReadUInt32();
-		result.face_vert_index = new uint[face_vert_count];
-		for (uint i = 0, i_max = (uint)result.face_vert_index.Length; i < i_max; ++i) {
-			result.face_vert_index[i] = CastIntRead(binary_reader_, format_.header.vertexIndexSize);
-		}
-		return result;
-	}
-
-	private PMXFormat.TextureList ReadTextureList() {
-		PMXFormat.TextureList result = new PMXFormat.TextureList();
-		uint texture_file_count = binary_reader_.ReadUInt32();
-		result.texture_file = new string[texture_file_count];
-		for (uint i = 0, i_max = (uint)result.texture_file.Length; i < i_max; ++i) {
-			result.texture_file[i] = ReadString();
-			//"./"開始なら削除する
-			if (('.' == result.texture_file[i][0]) && (1 == result.texture_file[i].IndexOfAny(new[]{'/', '\\'}, 1, 1))) {
-				result.texture_file[i] = result.texture_file[i].Substring(2);
-			}
-		}
-		return result;
-	}
-
-	private IEnumerable<PMXFormat.Material> ReadMaterialList() {
-		uint material_count = binary_reader_.ReadUInt32();
-        for (uint i = 0; i < material_count; ++i)
-        {
-			yield return ReadMaterial();
-		}
-	}
-	
 	private PMXFormat.Material ReadMaterial() {
 		PMXFormat.Material result = new PMXFormat.Material();
 		result.name = ReadString();
@@ -253,15 +238,6 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private PMXFormat.BoneList ReadBoneList() {
-		PMXFormat.BoneList result = new PMXFormat.BoneList();
-		uint bone_count = binary_reader_.ReadUInt32();
-		result.bone = new PMXFormat.Bone[bone_count];
-		for (uint i = 0, i_max = (uint)result.bone.Length; i < i_max; ++i) {
-			result.bone[i] = ReadBone();
-		}
-		return result;
-	}
 
 	private PMXFormat.Bone ReadBone() {
 		PMXFormat.Bone result = new PMXFormat.Bone();
@@ -323,15 +299,7 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private PMXFormat.MorphList ReadMorphList() {
-		PMXFormat.MorphList result = new PMXFormat.MorphList();
-		uint morph_count = binary_reader_.ReadUInt32();
-		result.morph_data = new PMXFormat.MorphData[morph_count];
-		for (uint i = 0, i_max = (uint)result.morph_data.Length; i < i_max; ++i) {
-			result.morph_data[i] = ReadMorphData();
-		}
-		return result;
-	}
+
 
 	private PMXFormat.MorphData ReadMorphData() {
 		PMXFormat.MorphData result = new PMXFormat.MorphData();
@@ -421,15 +389,7 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private PMXFormat.DisplayFrameList ReadDisplayFrameList() {
-		PMXFormat.DisplayFrameList result = new PMXFormat.DisplayFrameList();
-		uint display_frame_count = binary_reader_.ReadUInt32();
-		result.display_frame = new PMXFormat.DisplayFrame[display_frame_count];
-		for (uint i = 0, i_max = (uint)result.display_frame.Length; i < i_max; ++i) {
-			result.display_frame[i] = ReadDisplayFrame();
-		}
-		return result;
-	}
+
 
 				
 	private PMXFormat.DisplayFrame ReadDisplayFrame() {
@@ -453,16 +413,6 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 	
-	private PMXFormat.RigidbodyList ReadRigidbodyList() {
-		PMXFormat.RigidbodyList result = new PMXFormat.RigidbodyList();
-		uint rigidbody_count = binary_reader_.ReadUInt32();
-		result.rigidbody = new PMXFormat.Rigidbody[rigidbody_count];
-		for (uint i = 0, i_max = (uint)result.rigidbody.Length; i < i_max; ++i) {
-			result.rigidbody[i] = ReadRigidbody();
-		}
-		return result;
-	}
-	
 	private PMXFormat.Rigidbody ReadRigidbody() {
 		PMXFormat.Rigidbody result = new PMXFormat.Rigidbody();
 		result.name = ReadString();
@@ -480,16 +430,6 @@ public partial class PMXLoaderScript {
 		result.recoil = binary_reader_.ReadSingle();
 		result.friction = binary_reader_.ReadSingle();
 		result.operation_type = (PMXFormat.Rigidbody.OperationType)binary_reader_.ReadByte();
-		return result;
-	}
-	
-	private PMXFormat.RigidbodyJointList ReadRigidbodyJointList() {
-		PMXFormat.RigidbodyJointList result = new PMXFormat.RigidbodyJointList();
-		uint joint_count = binary_reader_.ReadUInt32();
-		result.joint = new PMXFormat.Joint[joint_count];
-		for (uint i = 0, i_max = (uint)result.joint.Length; i < i_max; ++i) {
-			result.joint[i] = ReadJoint();
-		}
 		return result;
 	}
 	
