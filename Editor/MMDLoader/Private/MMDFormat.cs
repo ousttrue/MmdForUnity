@@ -21,7 +21,7 @@ namespace MMD
 			public VertexList vertex_list;
 			public FaceVertexList face_vertex_list;
 			public TextureList texture_list;
-			public MaterialList material_list;
+			public Material[] materials;
 			public BoneList bone_list;
 			public MorphList morph_list;
 			public DisplayFrameList display_frame_list;
@@ -189,11 +189,6 @@ namespace MMD
 			public class TextureList
 			{
 				public string[] texture_file;	// 100byte * 10個固定 
-			}
-			
-			public class MaterialList
-			{
-				public Material[] material; // 材質データ(70bytes/material)
 			}
 
 			public class Material

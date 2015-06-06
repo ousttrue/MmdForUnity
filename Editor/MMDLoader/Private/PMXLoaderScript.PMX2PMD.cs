@@ -115,7 +115,7 @@ public partial class PMXLoaderScript {
 
 	private static PMDFormat.MaterialList ConvertMaterialList(PMXFormat pmx) {
 		PMDFormat.MaterialList result = new PMDFormat.MaterialList();
-		result.material_count = (uint)pmx.material_list.material.Length;
+		result.material_count = (uint)pmx.materials.Length;
 		result.material = new PMDFormat.Material[result.material_count];
 		for (int i = 0; i < result.material_count; i++) {
 			result.material[i] = ConvertMaterial(pmx, i);
@@ -125,7 +125,7 @@ public partial class PMXLoaderScript {
 	
 	private static PMDFormat.Material ConvertMaterial(PMXFormat pmx, int material_index) {
 		PMDFormat.Material result = new PMDFormat.Material();
-		PMXFormat.Material pmx_material = pmx.material_list.material[material_index];
+		PMXFormat.Material pmx_material = pmx.materials[material_index];
 		result.diffuse_color = pmx_material.diffuse_color;
 		result.alpha = result.diffuse_color.a;
 		result.diffuse_color.a = 1.0f;

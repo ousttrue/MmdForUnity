@@ -29,7 +29,7 @@ public partial class PMXLoaderScript {
 		result.vertex_list = ConvertVertexList(pmd);
 		result.face_vertex_list = ConvertFaceVertexList(pmd);
 		result.texture_list = ConvertTextureList(pmd);
-		result.material_list = ConvertMaterialList(pmd, x=>CreateTextureIndex(ref result.texture_list.texture_file, x));
+		result.materials = ConvertMaterialList(pmd, x=>CreateTextureIndex(ref result.texture_list.texture_file, x)).ToArray();
 		result.bone_list = ConvertBoneList(pmd); 
 		result.morph_list = ConvertMorphList(pmd);
 		result.display_frame_list = ConvertDisplayFrameList(pmd);
@@ -163,13 +163,10 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private static PMXFormat.MaterialList ConvertMaterialList(PMDFormat pmd, System.Func<string, uint> get_texture_index) {
-		PMXFormat.MaterialList result = new PMXFormat.MaterialList();
-		result.material = new PMXFormat.Material[pmd.material_list.material.Length];
-		for (int i = 0; i < result.material.Length; i++) {
-			result.material[i] = ConvertMaterial(pmd, i, get_texture_index);
+	private static IEnumerable<PMXFormat.Material> ConvertMaterialList(PMDFormat pmd, System.Func<string, uint> get_texture_index) {
+		for (int i = 0; i < pmd.material_list.material.Length; i++) {
+			yield return ConvertMaterial(pmd, i, get_texture_index);
 		}
-		return result;
 	}
 	
 	private static PMXFormat.Material ConvertMaterial(PMDFormat pmd, int material_index, System.Func<string, uint> get_texture_index) {

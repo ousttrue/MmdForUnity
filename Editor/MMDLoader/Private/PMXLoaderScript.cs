@@ -3,6 +3,7 @@ using UnityEditor;
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
+using System.Linq;
 using MMD.PMX;
 using MMD.PMD;
 	
@@ -64,7 +65,7 @@ public partial class PMXLoaderScript {
 		format_.vertex_list = ReadVertexList();
 		format_.face_vertex_list = ReadFaceVertexList();
 		format_.texture_list = ReadTextureList();
-		format_.material_list = ReadMaterialList();
+		format_.materials = ReadMaterialList().ToArray();
 		format_.bone_list = ReadBoneList(); 
 		format_.morph_list = ReadMorphList();
 		format_.display_frame_list = ReadDisplayFrameList();
@@ -222,14 +223,12 @@ public partial class PMXLoaderScript {
 		return result;
 	}
 
-	private PMXFormat.MaterialList ReadMaterialList() {
-		PMXFormat.MaterialList result = new PMXFormat.MaterialList();
+	private IEnumerable<PMXFormat.Material> ReadMaterialList() {
 		uint material_count = binary_reader_.ReadUInt32();
-		result.material = new PMXFormat.Material[material_count];
-		for (uint i = 0, i_max = (uint)result.material.Length; i < i_max; ++i) {
-			result.material[i] = ReadMaterial();
+        for (uint i = 0; i < material_count; ++i)
+        {
+			yield return ReadMaterial();
 		}
-		return result;
 	}
 	
 	private PMXFormat.Material ReadMaterial() {

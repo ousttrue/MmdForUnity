@@ -97,7 +97,7 @@ namespace MMD
             //スケール・エッジ幅
             engine.scale = scale_;
             engine.outline_width = 1.0f;
-            engine.material_outline_widths = format.material_list.material.Select(x => x.edge_size).ToArray();
+            engine.material_outline_widths = format.materials.Select(x => x.edge_size).ToArray();
             engine.enable_render_queue = false; //初期値無効
             const int c_render_queue_transparent = 3000;
             engine.render_queue_value = c_render_queue_transparent;
@@ -106,7 +106,7 @@ namespace MMD
             float progress = 1.0f / 3.0f;
 
             UnityEditor.EditorUtility.DisplayProgressBar("CreatePrefab", "Import Pmx(CreteMesh)...", progress);
-            var creation_info = CreateMeshCreationInfo();				// メッシュを作成する為の情報を作成
+            var creation_info = CreateMeshCreationInfoMulti();				// メッシュを作成する為の情報を作成
             var mesh = CreateMesh(creation_info);									// メッシュの生成・設定
             progress += progressUnit;
 
@@ -183,72 +183,21 @@ namespace MMD
             return root_game_object_;
         }
 
-
-        /// <summary>
-        /// メッシュを作成する為の情報を作成
-        /// </summary>
-        /// <returns>メッシュ作成情報</returns>
-        MeshCreationInfo[] CreateMeshCreationInfo()
-        {
-            // 1メッシュで収まる場合でも-Multi()を使っても問題は起き無いが、
-            // -Multi()では頂点数計測をマテリアル単位で行う関係上、頂点数が多く見積もられる(概算値)。
-            // (1頂点を複数のマテリアルが参照している場合に参照している分だけ計上してしまう。)
-            // 依って上限付近では本来1メッシュで収まる物が複数メッシュに分割されてしまう事が有るので注意。
-            // 
-            // -Multi()を使っても最終的には頂点数を最適化するので、
-            // 1メッシュに収まってしまえば-Single()と同じ頂点数に為る(確定値)。
-            // 
-            // 単純に-Single()の方が解析が少ない分早い。
-
-            MeshCreationInfo[] result;
-            if (format_.vertex_list.vertex.Length < c_max_vertex_count_in_mesh)
-            {
-                //1メッシュで収まるなら
-                result = CreateMeshCreationInfoSingle();
-            }
-            else
-            {
-                //1メッシュで収まらず、複数メッシュに分割するなら
-                result = CreateMeshCreationInfoMulti();
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// メッシュを作成する為の情報を作成(単体メッシュ版)
-        /// </summary>
-        /// <returns>メッシュ作成情報</returns>
-        MeshCreationInfo[] CreateMeshCreationInfoSingle()
-        {
-            MeshCreationInfo[] result = new[] { new MeshCreationInfo() };
-            //全マテリアルを設定
-            result[0].submeshes = CreateMeshCreationInfoPacks();
-            //全頂点を設定
-            result[0].all_vertices = Enumerable.Range(0, format_.vertex_list.vertex.Length).Select(x => (uint)x).ToArray();
-            //頂点リアサインインデックス用辞書作成
-            result[0].reassign_dictionary = new Dictionary<uint, uint>(result[0].all_vertices.Length);
-            for (uint i = 0, i_max = (uint)result[0].all_vertices.Length; i < i_max; ++i)
-            {
-                result[0].reassign_dictionary[i] = i;
-            }
-            return result;
-        }
-
         /// <summary>
         /// 全マテリアルをメッシュ作成情報のマテリアルパックとして返す
         /// </summary>
         /// <returns>メッシュ作成情報のマテリアルパック</returns>
-        Submesh[] CreateMeshCreationInfoPacks()
+        static Submesh[] CreateMeshCreationInfoPacks(PMXFormat format)
         {
             uint plane_start = 0;
             //マテリアル単位のPackを作成する
-            return Enumerable.Range(0, format_.material_list.material.Length)
+            return Enumerable.Range(0, format.materials.Length)
                             .Select(x =>
                             {
                                 Submesh pack = new Submesh();
                                 pack.material_index = (uint)x;
-                                uint plane_count = format_.material_list.material[x].face_vert_count;
-                                pack.indices = format_.face_vertex_list.face_vert_index.Skip((int)plane_start)
+                                uint plane_count = format.materials[x].face_vert_count;
+                                pack.indices = format.face_vertex_list.face_vert_index.Skip((int)plane_start)
                                                                                                     .Take((int)plane_count)
                                                                                                     .ToArray();
                                 pack.unique_vertex_count = pack.indices.Distinct().Count(); //重複削除
@@ -265,7 +214,7 @@ namespace MMD
         MeshCreationInfo[] CreateMeshCreationInfoMulti()
         {
             //マテリアル単位のPackを作成する
-            Submesh[] packs = CreateMeshCreationInfoPacks();
+            Submesh[] packs = CreateMeshCreationInfoPacks(format_);
             //マテリアル細分化
             packs = SplitSubMesh(packs);
             //頂点数の多い順に並べる(メッシュ分割アルゴリズム上、後半に行く程頂点数が少ない方が敷き詰め効率が良い)
@@ -550,7 +499,7 @@ namespace MMD
             bool[] is_transparent_by_material_morph = IsTransparentByMaterialMorph(); //材質モーフ
             bool[] is_transparent_by_texture_alpha = IsTransparentByTextureAlpha(); //テクスチャのアルファ値(UV考慮済み)
 
-            return Enumerable.Range(0, format_.material_list.material.Length)
+            return Enumerable.Range(0, format_.materials.Length)
                             .Select(x => new
                             {
                                 material_index = (uint)x
@@ -569,7 +518,7 @@ namespace MMD
         bool[] IsTransparentByMaterial()
         {
             //拡散色とエッジ色の透過確認
-            bool[] result = format_.material_list.material.Select(x => (x.diffuse_color.a < 1.0f) || (x.edge_color.a < 1.0f))
+            bool[] result = format_.materials.Select(x => (x.diffuse_color.a < 1.0f) || (x.edge_color.a < 1.0f))
                                                             .ToArray();
             return result;
         }
@@ -580,7 +529,7 @@ namespace MMD
         /// <returns>透過かの配列(true:透過, false:不透明)</returns>
         bool[] IsTransparentByMaterialMorph()
         {
-            bool[] result = Enumerable.Repeat(false, format_.material_list.material.Length)
+            bool[] result = Enumerable.Repeat(false, format_.materials.Length)
                                         .ToArray();
             var transparent_material_indices = format_.morph_list.morph_data.Where(x => PMXFormat.MorphData.MorphType.Material == x.morph_type) //材質モーフなら
                                                                             .SelectMany(x => x.morph_offset) //材質モーフオフセット取得
@@ -592,7 +541,7 @@ namespace MMD
             {
                 //材質モーフに依って透過が要望されているなら
                 //透過扱いにする
-                if (material_index < (uint)format_.material_list.material.Length)
+                if (material_index < (uint)format_.materials.Length)
                 {
                     //単体モーフのマテリアルインデックスなら
                     //対象マテリアルだけ透過扱い
@@ -617,13 +566,12 @@ namespace MMD
         {
             var textures = GetTextureList();
             var uvs = GetUvList();
-            bool[] result = Enumerable.Range(0, format_.material_list.material.Length)
+            return Enumerable.Range(0, format_.materials.Length)
                                         .Select(x => ((null != textures[x])
                                                     ? IsTransparentByTextureAlphaWithUv(textures[x], uvs[x])
                                                     : false
                                                 ))
                                         .ToArray();
-            return result;
         }
 
         /// <summary>
@@ -632,7 +580,7 @@ namespace MMD
         /// <returns>テクスチャ配列</returns>
         UnityEngine.Texture2D[] GetTextureList()
         {
-            string[] texture_path = format_.material_list.material.Select(x => x.usually_texture_index) //材質が使用しているテクスチャインデックスを取得
+            string[] texture_path = format_.materials.Select(x => x.usually_texture_index) //材質が使用しているテクスチャインデックスを取得
                                                                     .Select(x => ((x < format_.texture_list.texture_file.Length) ? format_.texture_list.texture_file[x] : null)) //有効なテクスチャインデックスならパスの取得
                                                                     .ToArray();
             alpha_readable_texture_ = new AlphaReadableTexture(texture_path
@@ -653,21 +601,23 @@ namespace MMD
         /// </remarks>
         UnityEngine.Vector2[][] GetUvList()
         {
-            uint[][] vertex_list = CreateMeshCreationInfoPacks().Select(x => x.indices).ToArray();
+            var vertex_list = CreateMeshCreationInfoPacks(format_).Select(x => x.indices).ToArray();
 
-            Dictionary<uint, UnityEngine.Vector4>[] uv_morphs = format_.morph_list.morph_data
+            var uv_morphs = format_.morph_list.morph_data
                                                             .Where(x => PMXFormat.MorphData.MorphType.Uv == x.morph_type) //UVモーフなら
                                                             .Select(x => x.morph_offset.Select(y => (PMXFormat.UVMorphOffset)y)
                                                                                     .ToDictionary(z => z.vertex_index, z => z.uv_offset) //頂点インデックスでディクショナリ化
                                                                     ) //UVモーフオフセット取得
                                                             .ToArray();
 
-            List<UnityEngine.Vector2>[] result = vertex_list.Select(x => x.Select(y => format_.vertex_list.vertex[y].uv).ToList()).ToArray();
+            var uv_list = vertex_list.Select(x => x.Select(y => format_.vertex_list.vertex[y].uv).ToList()).ToArray();
 
             //材質走査
             bool is_cancel = false;
-            for (int material_index = 0, material_index_max = result.Length; material_index < material_index_max; ++material_index)
+            for (int material_index = 0, material_index_max = uv_list.Length; material_index < material_index_max; ++material_index)
             {
+                var indices = vertex_list[material_index];
+
                 //UVモーフ走査
                 for (int uv_morph_index = 0, uv_morph_index_max = uv_morphs.Length; uv_morph_index < uv_morph_index_max; ++uv_morph_index)
                 {
@@ -675,7 +625,7 @@ namespace MMD
                     //ブログレスパー更新
                     is_cancel = UnityEditor.EditorUtility.DisplayCancelableProgressBar("Create UV Area Infomation"
                                                                             , "Material:[" + material_index + "|" + material_index_max + "]"
-                                                                                + format_.material_list.material[material_index].name
+                                                                                + format_.materials[material_index].name
                                                                                 + "\t"
                                                                                 + "UV Morph:[" + uv_morph_index + "|" + uv_morph_index_max + "]"
                                                                                 + format_.morph_list.morph_data.Where(x => PMXFormat.MorphData.MorphType.Uv == x.morph_type).Skip(uv_morph_index).First().morph_name
@@ -687,17 +637,17 @@ namespace MMD
                     }
 
                     //先行UVモーフ対象確認(三角形構成を無視して全頂点をUVモーフ参照)
-                    var vertex_dictionary = vertex_list[material_index].Distinct().ToDictionary(x => x, x => true); //(UVモーフに設定されている頂点数依りも三角形構成頂点の方が多いと思うので、そちら側をlogNにする為に辞書作成)
+                    var vertex_dictionary = indices.Distinct().ToDictionary(x => x, x => true); //(UVモーフに設定されている頂点数依りも三角形構成頂点の方が多いと思うので、そちら側をlogNにする為に辞書作成)
                     if (uv_morph.Keys.Any(x => vertex_dictionary.ContainsKey(x)))
                     {
                         //UVモーフ対象なら
                         //頂点走査(三角形構成頂点走査)
-                        for (int vertex_index = 0, vertex_index_max = vertex_list[material_index].Length; vertex_index < vertex_index_max; vertex_index += 3)
+                        for (int vertex_index = 0, vertex_index_max = indices.Length; vertex_index < vertex_index_max; vertex_index += 3)
                         {
                             //三角形構成頂点インデックス取り出し
-                            uint[] tri_vertices = new[]{vertex_list[material_index][vertex_index+0]
-														, vertex_list[material_index][vertex_index+1]
-														, vertex_list[material_index][vertex_index+2]
+                            uint[] tri_vertices = new[]{indices[vertex_index+0]
+														, indices[vertex_index+1]
+														, indices[vertex_index+2]
 														};
                             //UVモーフ対象確認
                             if (tri_vertices.Any(x => uv_morph.ContainsKey(x)))
@@ -713,7 +663,7 @@ namespace MMD
                                                                 )
                                                         .Select(x => new UnityEngine.Vector2(x.original_uv.x + x.add_uv.x, x.original_uv.y + x.add_uv.y));
                                 //追加
-                                result[material_index].AddRange(tri_uv);
+                                uv_list[material_index].AddRange(tri_uv);
                             }
                         }
                     }
@@ -724,7 +674,7 @@ namespace MMD
                 }
             }
 
-            return result.Select(x => x.ToArray()).ToArray();
+            return uv_list.Select(x => x.ToArray()).ToArray();
         }
 
         /// <summary>
@@ -829,7 +779,7 @@ namespace MMD
         /// <param name='is_transparent'>透過か</param>
         UnityEngine.Material ConvertMaterial(uint material_index, bool is_transparent)
         {
-            PMXFormat.Material material = format_.material_list.material[material_index];
+            PMXFormat.Material material = format_.materials[material_index];
 
             //先にテクスチャ情報を検索
             UnityEngine.Texture2D main_texture = null;
@@ -1070,7 +1020,7 @@ namespace MMD
 
             for (int i = 0, i_max = materials.Length; i < i_max; ++i)
             {
-                string name = GetFilePathString(format_.material_list.material[i].name);
+                string name = GetFilePathString(format_.materials[i].name);
                 string file_name = path + i.ToString() + "_" + name + ".asset";
                 UnityEditor.AssetDatabase.CreateAsset(materials[i], file_name);
             }
@@ -1501,11 +1451,11 @@ namespace MMD
             {
                 //最後が uint.MaxValue(≒-1) なら
                 //全材質対象が存在するので全インデックスを取得
-                original_indices = Enumerable.Range(0, format_.material_list.material.Length + 1).Select(x => (uint)x).ToList();
-                original_indices[format_.material_list.material.Length] = uint.MaxValue; //uint.MaxValueを忘れない
+                original_indices = Enumerable.Range(0, format_.materials.Length + 1).Select(x => (uint)x).ToList();
+                original_indices[format_.materials.Length] = uint.MaxValue; //uint.MaxValueを忘れない
             }
             int[] indices = original_indices.Select(x => (int)x).ToArray();
-            MaterialMorph.MaterialMorphParameter[] source = indices.Where(x => x < format_.material_list.material.Length)
+            MaterialMorph.MaterialMorphParameter[] source = indices.Where(x => x < format_.materials.Length)
                                                                     .Select(x =>
                                                                     {  //インデックスを用いて、元データをパック
                                                                         MaterialMorph.MaterialMorphParameter result = new MaterialMorph.MaterialMorphParameter();
@@ -1513,7 +1463,7 @@ namespace MMD
                                                                         {
                                                                             //-1(全材質対象)で無いなら
                                                                             //元データを取得
-                                                                            PMXFormat.Material y = format_.material_list.material[x];
+                                                                            PMXFormat.Material y = format_.materials[x];
                                                                             result.color = y.diffuse_color;
                                                                             result.specular = new UnityEngine.Color(y.specular_color.r, y.specular_color.g, y.specular_color.b, y.specularity);
                                                                             result.ambient = y.ambient_color;
@@ -1564,7 +1514,7 @@ namespace MMD
             }
 
             //メッシュ別インデックスの作成
-            int invalid_material_index = format_.material_list.material.Length;
+            int invalid_material_index = format_.materials.Length;
             MorphManager.MaterialMorphPack.Meshes[] multi_indices = new MorphManager.MaterialMorphPack.Meshes[creation_info.Length];
             for (int i = 0, i_max = creation_info.Length; i < i_max; ++i)
             {
