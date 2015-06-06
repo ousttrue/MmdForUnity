@@ -128,9 +128,9 @@ namespace MMD
     public class PMDImportConfig : ConfigBase
     {
         public PMDConverter.ShaderType shader_type = PMDConverter.ShaderType.MMDShader;
-        public PMXConverter.AnimationType animation_type = PMXConverter.AnimationType.LegacyAnimation;
+        public PMXConverter.AnimationType animation_type = PMXConverter.AnimationType.HumanMecanim;
         public bool rigidFlag = true;
-        public bool use_ik = true;
+        public bool use_ik = false;
         public float scale = 0.085f;
         public bool is_pmx_base_import = true;
 
