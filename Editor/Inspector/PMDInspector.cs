@@ -7,7 +7,7 @@ using System;
 
 namespace MMD
 {
-    [CustomEditor(typeof(PMDScriptableObject))]
+    //[CustomEditor(typeof(PMDScriptableObject))]
     public class PMDInspector : Editor
     {
         PMDImportConfig pmd_config;
@@ -16,24 +16,38 @@ namespace MMD
         private ModelAgent model_agent;
         private string message = "";
 
+        public static bool CanInspect(UnityEngine.Object target)
+        {
+            var assetPath = AssetDatabase.GetAssetPath(target);
+            var ext=Path.GetExtension(assetPath).ToLower();
+            return ext==".pmd" || ext==".pmx";
+        }
+
         /// <summary>
         /// 有効化処理
         /// </summary>
         private void OnEnable()
         {
-            // デフォルトコンフィグ
             var config = MMD.Config.LoadAndCreate();
-            pmd_config = config.pmd_config.Clone();
-            
-            // モデル情報
-            if (config.inspector_config.use_pmd_preload)
+
+            // デフォルトコンフィグ
+            if (pmd_config == null)
             {
-                var obj = (PMDScriptableObject)target;
-                model_agent = new ModelAgent(obj.assetPath);
+                pmd_config = config.pmd_config.Clone();
             }
-            else
+
+            if(model_agent==null)
             {
-                model_agent = null;
+                // モデル情報
+                if (config.inspector_config.use_pmd_preload)
+                {
+                    var assetPath = AssetDatabase.GetAssetPath(target);
+                    model_agent = new ModelAgent(assetPath);
+                }
+                else
+                {
+                    model_agent = null;
+                }
             }
         }
 
