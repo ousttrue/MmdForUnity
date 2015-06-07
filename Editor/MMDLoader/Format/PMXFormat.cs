@@ -24,6 +24,21 @@ namespace MMD {
 				public string path;			// フルパス
 				public string name;			// 拡張子とパス抜きのファイルの名前
 				public string folder;		// ファイル名抜きのパス
+
+                public string export_folder_name
+                {
+                    get
+                    {
+                        return name + ".convert";
+                    }
+                }
+                public string export_folder
+                {
+                    get
+                    {
+                        return System.IO.Path.Combine(folder, export_folder_name);
+                    }
+                }
 			}
 
 			public class Header

@@ -1,9 +1,7 @@
-﻿using UnityEngine;
-using UnityEditor;
-using System.Collections;
-using MMD.PMD;
+﻿using System;
 using System.IO;
-using System;
+using UnityEditor;
+using UnityEngine;
 
 namespace MMD
 {
@@ -64,7 +62,7 @@ namespace MMD
 
             // Convertボタン
             EditorGUILayout.Space();
-            if (message.Length != 0)
+            if (!String.IsNullOrEmpty(message))
             {
                 GUILayout.Label(message);
             }
@@ -72,38 +70,52 @@ namespace MMD
             {
                 if (GUILayout.Button("Convert to Prefab"))
                 {
-                    if (null == model_agent) {
-                        var obj = (PMDScriptableObject)target;
-                        model_agent = new ModelAgent(obj.assetPath);
-                    }
-                    try
+                    if (model_agent == null)
                     {
-                        message = model_agent.CreatePrefab(pmd_config.shader_type
-                                                , pmd_config.rigidFlag
-                                                , pmd_config.animation_type
-                                                , pmd_config.use_ik
-                                                , pmd_config.scale
-                                                , pmd_config.is_pmx_base_import
-                                                );
+                        var assetPath = AssetDatabase.GetAssetPath(target);
+                        model_agent = new ModelAgent(assetPath);
                     }
-                    catch(Exception ex)
-                    {
-                        message = ex.Message;
-                        throw;
-                    }
+                    OnConvertButton();
                 }
             }
             GUILayout.Space(40);
 
             // モデル情報
             if (model_agent == null) return;
+
             EditorGUILayout.LabelField("Model Name");
-            EditorGUILayout.LabelField(model_agent.name, EditorStyles.textField);
+            EditorGUILayout.LabelField(model_agent.Header.model_name, EditorStyles.textField);
 
             EditorGUILayout.Space();
 
             EditorGUILayout.LabelField("Comment");
-            EditorGUILayout.LabelField(model_agent.comment, EditorStyles.textField, GUILayout.Height(300));
+            EditorGUILayout.LabelField(model_agent.Header.comment, EditorStyles.textField, GUILayout.Height(300));
+        }
+
+        void OnConvertButton()
+        {
+
+            if (null == model_agent) return;
+
+            try
+            {
+                var go = model_agent.CreateGameObject(pmd_config.shader_type
+                                        , pmd_config.rigidFlag
+                                        , pmd_config.animation_type
+                                        , pmd_config.use_ik
+                                        , pmd_config.scale
+                                        , pmd_config.is_pmx_base_import
+                                        );
+                // プレファブ化
+                PrefabUtility.CreatePrefab(model_agent.PrefabPath, go, ReplacePrefabOptions.ConnectToPrefab);
+
+                // アセットリストの更新
+                AssetDatabase.Refresh();
+            }
+            finally
+            {
+                message = model_agent.Message;
+            }
         }
     }
 }

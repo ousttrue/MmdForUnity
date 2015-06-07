@@ -289,7 +289,7 @@ namespace MMD
                         throw new System.ArgumentException();
                 }
 
-                string path = format_.meta_header.folder + "/";
+                string path = format_.meta_header.export_folder + "/";
                 string name = GetFilePathString(format_.meta_header.name);
                 string file_name = path + name + ".avatar.asset";
                 avatar_setting.CreateAsset(file_name);
@@ -437,10 +437,10 @@ namespace MMD
         /// <param name='index'>メッシュインデックス</param>
         void CreateAssetForMesh(UnityEngine.Mesh mesh, int index)
         {
-            string path = format_.meta_header.folder + "/Meshes/";
+            string path = format_.meta_header.export_folder + "/Meshes/";
             if (!System.IO.Directory.Exists(path))
             {
-                UnityEditor.AssetDatabase.CreateFolder(format_.meta_header.folder, "Meshes");
+                UnityEditor.AssetDatabase.CreateFolder(format_.meta_header.export_folder, "Meshes");
             }
 
             string name = GetFilePathString(format_.meta_header.name);
@@ -456,10 +456,10 @@ namespace MMD
         IEnumerable<UnityEngine.Material[]> CreateMaterials(IEnumerable<MeshCreationInfo> creation_info)
         {
             // 適当なフォルダに投げる
-            string path = format_.meta_header.folder + "/Materials/";
+            string path = format_.meta_header.export_folder + "/Materials/";
             if (!System.IO.Directory.Exists(path))
             {
-                UnityEditor.AssetDatabase.CreateFolder(format_.meta_header.folder, "Materials");
+                UnityEditor.AssetDatabase.CreateFolder(format_.meta_header.export_folder, "Materials");
             }
 
             //全マテリアルを作成
@@ -567,7 +567,8 @@ namespace MMD
                         .ToArray();
             alpha_readable_texture_ = new AlphaReadableTexture(texture_path
                                                             , format_.meta_header.folder + "/"
-                                                            , format_.meta_header.folder + "/Materials/"
+
+                                                            , format_.meta_header.export_folder + "/Materials/"
                                                             );
             return alpha_readable_texture_.textures;
         }
@@ -998,7 +999,7 @@ namespace MMD
         /// <param name='materials'>対象マテリアル</param>
         void CreateAssetForMaterials(UnityEngine.Material[] materials)
         {
-            string path = format_.meta_header.folder + "/Materials/";
+            string path = format_.meta_header.export_folder + "/Materials/";
 
             for (int i = 0, i_max = materials.Length; i < i_max; ++i)
             {
@@ -1671,9 +1672,9 @@ namespace MMD
         /// <returns>剛体</returns>
         UnityEngine.GameObject[] CreateRigids()
         {
-            if (!System.IO.Directory.Exists(System.IO.Path.Combine(format_.meta_header.folder, "Physics")))
+            if (!System.IO.Directory.Exists(System.IO.Path.Combine(format_.meta_header.export_folder, "Physics")))
             {
-                UnityEditor.AssetDatabase.CreateFolder(format_.meta_header.folder, "Physics");
+                UnityEditor.AssetDatabase.CreateFolder(format_.meta_header.export_folder, "Physics");
             }
 
             // 剛体の登録
@@ -1769,7 +1770,7 @@ namespace MMD
             material.dynamicFriction = rigidbody.friction;
 
             string name = GetFilePathString(rigidbody.name);
-            string file_name = format_.meta_header.folder + "/Physics/" + index.ToString() + "_" + name + ".asset";
+            string file_name = format_.meta_header.export_folder + "/Physics/" + index.ToString() + "_" + name + ".asset";
             UnityEditor.AssetDatabase.CreateAsset(material, file_name);
             return material;
         }
