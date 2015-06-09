@@ -104,7 +104,6 @@ namespace MMD
                                         , pmd_config.animation_type
                                         , pmd_config.use_ik
                                         , pmd_config.scale
-                                        , pmd_config.is_pmx_base_import
                                         );
                 // プレファブ化
                 PrefabUtility.CreatePrefab(model_agent.PrefabPath, go, ReplacePrefabOptions.ConnectToPrefab);

@@ -24,7 +24,7 @@ public partial class PMXLoaderScript {
 	/// <returns>内部形式データ</returns>
 	public static PMXFormat PMD2PMX(PMDFormat pmd) {
 		PMXFormat result = new PMXFormat();
-		result.meta_header = CreateMetaHeader(pmd);
+        result.path = pmd.path;
 		result.header = ConvertHeader(pmd.head, pmd.eg_head, pmd);
 		result.vertices = pmd.vertex_list.vertex.Select(x=>ConvertVertex(x)).ToArray();
 		result.indices = pmd.face_vertex_list.face_vert_index.Select(x=>(int)x).ToArray();
@@ -73,15 +73,7 @@ public partial class PMXLoaderScript {
 		}
 		return result;
 	}
-	
-	private static PMXFormat.MetaHeader CreateMetaHeader(PMDFormat pmd) {
-		PMXFormat.MetaHeader result = new PMXFormat.MetaHeader();
-		result.path = pmd.path;
-		result.name = pmd.name;
-		result.folder = pmd.folder;
-		return result;
-	}
-	
+		
 	private static PMXFormat.Header ConvertHeader(PMDFormat.Header pmd_header, PMDFormat.EnglishHeader pmd_english_header, PMDFormat pmd) {
 		PMXFormat.Header result = new PMXFormat.Header();
 		result.magic = pmd_header.magic;

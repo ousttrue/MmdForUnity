@@ -59,8 +59,10 @@ public partial class PMXLoaderScript {
 	}
 
 	private PMXFormat Read() {
-		format_ = new PMXFormat();
-		format_.meta_header = CreateMetaHeader();
+        format_ = new PMXFormat
+        {
+            path=file_path_,
+        };
 		format_.header = ReadHeader();
         format_.vertices = Enumerable.Range(0, binary_reader_.ReadInt32())
             .Select(_ => ReadVertex())
@@ -99,14 +101,6 @@ public partial class PMXLoaderScript {
             .Select(_=>ReadJoint())
             .ToArray();
 		return format_;
-	}
-
-	private PMXFormat.MetaHeader CreateMetaHeader() {
-		PMXFormat.MetaHeader result = new PMXFormat.MetaHeader();
-		result.path = file_path_;
-		result.name = Path.GetFileNameWithoutExtension(file_path_); // .pmdを抜かす
-		result.folder = Path.GetDirectoryName(file_path_); // PMDが格納されているフォルダ
-		return result;
 	}
 	
 	private PMXFormat.Header ReadHeader() {

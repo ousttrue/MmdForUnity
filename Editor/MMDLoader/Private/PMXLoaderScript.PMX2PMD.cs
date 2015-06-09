@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MMD.PMX;
 using MMD.PMD;
+using System.IO;
 
 public partial class PMXLoaderScript {
 
@@ -46,9 +47,8 @@ public partial class PMXLoaderScript {
 	}
 
 	private static void ConvertPathes(PMDFormat pmd, PMXFormat pmx) {
-		pmd.path = pmx.meta_header.path;
-		pmd.name = pmx.meta_header.name;
-		pmd.folder = pmx.meta_header.folder;
+		pmd.path = pmx.path;
+		pmd.name = Path.GetFileNameWithoutExtension(pmx.path);
 	}
 	
 	private static PMDFormat.Header ConvertHeader(PMXFormat.Header pmx_header) {

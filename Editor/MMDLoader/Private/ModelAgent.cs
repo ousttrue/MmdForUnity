@@ -2,6 +2,7 @@
 using UnityEditor;
 using System.Collections.Generic;
 using System;
+using System.IO;
 
 namespace MMD
 {
@@ -72,19 +73,12 @@ namespace MMD
         /// <param name='use_ik'>IKを使用するか</param>
         /// <param name='scale'>スケール</param>
         /// <param name='is_pmx_base_import'>PMX Baseでインポートするか</param>
-        public GameObject CreateGameObject(PMDConverter.ShaderType shader_type, bool use_rigidbody, PMXConverter.AnimationType animation_type, bool use_ik, float scale, bool is_pmx_base_import)
+        public GameObject CreateGameObject(ShaderType shader_type, bool use_rigidbody, AnimationType animation_type, bool use_ik, float scale)
         {
             try
             {
                 Message = "Successfully converted.";
-                if (is_pmx_base_import)
-                {
-                    return CreateGameObjectFromPmx(shader_type, use_rigidbody, animation_type, use_ik, scale);
-                }
-                else
-                {
-                    return CreateGameObjectFromPmd(shader_type, use_rigidbody, animation_type, use_ik, scale);
-                }
+                return CreateGameObjectFromPmx(shader_type, use_rigidbody, animation_type, use_ik, scale);
             }
             catch(Exception ex)
             {
@@ -97,7 +91,7 @@ namespace MMD
             }
         }
 
-        private GameObject CreateGameObjectFromPmx(PMDConverter.ShaderType shader_type, bool use_rigidbody, PMXConverter.AnimationType animation_type, bool use_ik, float scale)
+        private GameObject CreateGameObjectFromPmx(ShaderType shader_type, bool use_rigidbody, AnimationType animation_type, bool use_ik, float scale)
         {
             EditorUtility.DisplayProgressBar("CreatePrefab", "Import Pmx...", 0);
 
@@ -118,46 +112,26 @@ namespace MMD
             }
             Header = pmx_format.header;
 
-            // 出力フォルダ
-            if (!System.IO.Directory.Exists(pmx_format.meta_header.export_folder))
-            {
-                UnityEditor.AssetDatabase.CreateFolder(pmx_format.meta_header.folder, pmx_format.meta_header.export_folder_name);
-            }
+            var export_folder=Path.Combine(Path.GetDirectoryName(pmx_format.path), Path.GetFileNameWithoutExtension(pmx_format.path) + ".convert");
+            export_folder.CreateUnityFolder();
+            var mesh_folder = export_folder + "/Meshes/";
+            mesh_folder.CreateUnityFolder();
+            var texture_folder = export_folder + "/Textures/";
+            texture_folder.CreateUnityFolder();
+            var material_folder = export_folder + "/Materials/";
+            material_folder.CreateUnityFolder();
+            var physics_folder = export_folder + "/Physics/";
+            physics_folder.CreateUnityFolder();
+
+            //全マテリアルを作成
+
 
             // プレファブパスの設定
-            PrefabPath = pmx_format.meta_header.export_folder + "/" + pmx_format.meta_header.name + ".prefab";
+            PrefabPath = export_folder + "/" + Path.GetFileNameWithoutExtension(pmx_format.path) + ".prefab";
 
-            return PMXConverter.CreateGameObject(pmx_format, use_rigidbody, animation_type, use_ik, scale);
-        }
-
-        [Obsolete]
-        private GameObject CreateGameObjectFromPmd(PMDConverter.ShaderType shader_type, bool use_rigidbody, PMXConverter.AnimationType animation_type, bool use_ik, float scale)
-        {
-            EditorUtility.DisplayProgressBar("CreatePrefab", "Import Pmd...", 0);
-
-            //PMXエクスポーターを使用しない
-            //PMDファイルのインポート
-            PMD.PMDFormat pmd_format = null;
-            try
-            {
-                //PMX読み込みを試みる
-                PMX.PMXFormat pmx_format = PMXLoaderScript.Import(FilePath);
-                pmd_format = PMXLoaderScript.PMX2PMD(pmx_format);
-            }
-            catch (System.FormatException)
-            {
-                //PMXとして読み込めなかったら
-                //PMDとして読み込む
-                pmd_format = PMDLoaderScript.Import(FilePath);
-            }
-            Header = PMXLoaderScript.PMD2PMX(pmd_format.head);
-
-            // プレファブパスの設定
-            PrefabPath = pmd_format.folder + "/" + pmd_format.name + ".prefab";
-
-            //ゲームオブジェクトの作成
-            bool use_mecanim = PMXConverter.AnimationType.LegacyAnimation == animation_type;
-            return PMDConverter.CreateGameObject(pmd_format, shader_type, use_rigidbody, use_mecanim, use_ik, scale);
+            return PMXConverter.CreateGameObject(export_folder
+                , mesh_folder, texture_folder, material_folder
+                , pmx_format, use_rigidbody, animation_type, use_ik, scale);
         }
     }
 }

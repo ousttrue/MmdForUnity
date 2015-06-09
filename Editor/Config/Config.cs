@@ -127,12 +127,11 @@ namespace MMD
     [Serializable]
     public class PMDImportConfig : ConfigBase
     {
-        public PMDConverter.ShaderType shader_type = PMDConverter.ShaderType.MMDShader;
-        public PMXConverter.AnimationType animation_type = PMXConverter.AnimationType.HumanMecanim;
+        public ShaderType shader_type = ShaderType.MMDShader;
+        public AnimationType animation_type = AnimationType.HumanMecanim;
         public bool rigidFlag = true;
         public bool use_ik = false;
         public float scale = 0.085f;
-        public bool is_pmx_base_import = true;
 
         public override string GetTitle()
         {
@@ -141,9 +140,9 @@ namespace MMD
 
         public override void OnGUIFunction()
         {
-            shader_type = (PMDConverter.ShaderType)EditorGUILayout.EnumPopup("Shader Type", shader_type);
+            shader_type = (ShaderType)EditorGUILayout.EnumPopup("Shader Type", shader_type);
             rigidFlag = EditorGUILayout.Toggle("Rigidbody", rigidFlag);
-            animation_type = (PMXConverter.AnimationType)EditorGUILayout.EnumPopup("Animation Type", animation_type);
+            animation_type = (AnimationType)EditorGUILayout.EnumPopup("Animation Type", animation_type);
             use_ik = EditorGUILayout.Toggle("Use IK", use_ik);
             scale = EditorGUILayout.Slider("Scale", scale, 0.001f, 1.0f);
             EditorGUILayout.BeginHorizontal();
@@ -157,7 +156,6 @@ namespace MMD
                 }
             }
             EditorGUILayout.EndHorizontal();
-            is_pmx_base_import = EditorGUILayout.Toggle("Use PMX Base Import", is_pmx_base_import);
         }
 
         public PMDImportConfig Clone()
