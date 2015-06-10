@@ -58,8 +58,10 @@ public class PMDLoaderScript {
 	}
 
 	private PMDFormat Read() {
-		format_ = new PMDFormat();
-		EntryPathes();
+        format_ = new PMDFormat
+        {
+            path=new FileInfo(file_path_),
+        };
 		
 		try {
 			format_.head = ReadHeader();
@@ -85,12 +87,6 @@ public class PMDLoaderScript {
 			Debug.Log("Don't read full format");
 		}
 		return format_;
-	}
-
-	private void EntryPathes() {
-		format_.path = file_path_;
-		format_.name = Path.GetFileNameWithoutExtension(file_path_); // .pmdを抜かす
-		format_.folder = Path.GetDirectoryName(file_path_); // PMDが格納されているフォルダ
 	}
 	
 	private PMDFormat.Header ReadHeader() {

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.IO;
+using UnityEngine;
 
 // Reference URL:
 //	  http://blog.goo.ne.jp/torisu_tetosuki/e/209ad341d3ece2b1b4df24abf619d6e4
@@ -11,10 +12,7 @@ namespace MMD
 		// PMDのフォーマットクラス
 		public class PMDFormat
 		{
-			public string path;			// フルパス
-			public string name;			// 拡張子とパス抜きのファイルの名前
-			public string folder;		// ファイル名抜きのパス
-			
+			public FileInfo path;			
 			public Header head;
 			public VertexList vertex_list;
 			public FaceVertexList face_vertex_list;

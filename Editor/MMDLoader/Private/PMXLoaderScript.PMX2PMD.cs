@@ -25,7 +25,7 @@ public partial class PMXLoaderScript {
 	/// <returns>内部形式データ</returns>
 	public static PMDFormat PMX2PMD(PMXFormat pmx) {
 		PMDFormat result = new PMDFormat();
-		ConvertPathes(result, pmx);
+        result.path = pmx.path;
 		result.head = ConvertHeader(pmx.header);
 		result.vertex_list = ConvertVertexList(pmx);
 		result.face_vertex_list = ConvertFaceVertexList(pmx);
@@ -44,11 +44,6 @@ public partial class PMXLoaderScript {
 		result.rigidbody_list = ConvertRigidbodyList(pmx);
 		result.rigidbody_joint_list = ConvertRigidbodyJointList(pmx);
 		return result;
-	}
-
-	private static void ConvertPathes(PMDFormat pmd, PMXFormat pmx) {
-		pmd.path = pmx.path;
-		pmd.name = Path.GetFileNameWithoutExtension(pmx.path);
 	}
 	
 	private static PMDFormat.Header ConvertHeader(PMXFormat.Header pmx_header) {

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 using MMD.PMX;
+using System.IO;
 
 namespace MMD
 {
@@ -181,6 +182,7 @@ namespace MMD
         }
     }
 
+    /*
     static class StringExtensions
     {
         /// <summary>
@@ -188,9 +190,10 @@ namespace MMD
         /// </summary>
         /// <returns>ファイルパスに使用可能な文字列</returns>
         /// <param name='src'>ファイルパスに使用したい文字列</param>
-        public static string GetFilePathString(this string src)
+        public static string GetFilePathString(this String info)
         {
-            return src.Replace('\\', '＼')
+            return info.ToString()
+                        .Replace('\\', '＼')
                         .Replace('/', '／')
                         .Replace(':', '：')
                         .Replace('*', '＊')
@@ -202,13 +205,50 @@ namespace MMD
                         .Replace("\n", string.Empty)
                         .Replace("\r", string.Empty);
         }
+    }
+    */
 
-        public static void CreateUnityFolder(this string folder)
+    static class FileSystemInfoExtensions
+    {
+        public static string GetUnityAssetPath(this FileSystemInfo info)
         {
-            if (System.IO.Directory.Exists(folder)) return;
-            UnityEditor.AssetDatabase.CreateFolder(
-                System.IO.Path.GetDirectoryName(folder)
-                , System.IO.Path.GetFileName(folder));
+            var str = info.ToString().Replace('\\', '/');
+            if (!str.StartsWith(Application.dataPath))
+            {
+                return str;
+            }
+            return str.Substring(Application.dataPath.Length-("/Assets".Length)+1);
+        }
+    }
+
+    static class FileInfoExtensions
+    {
+        public static string GetNameWithoutExtension(this FileInfo path)
+        {
+            return path.Name.Substring(0, path.Name.Length - path.Extension.Length);
+        }
+    }
+
+    static class DirectoryInfoExtensions
+    {
+        public static void CreateUnityFolder(this DirectoryInfo folder)
+        {
+            if (folder.Exists)
+            {
+                return;
+            }
+            var dir = folder.Parent.GetUnityAssetPath();
+            UnityEditor.AssetDatabase.CreateFolder(dir, folder.Name);
+            Debug.Log("CreateFolder: " + dir + " + " + folder.Name);
+        }
+
+        public static DirectoryInfo ChildDirectory(this DirectoryInfo parent, String child)
+        {
+            return new DirectoryInfo(parent.FullName + "/" + child);
+        }
+        public static FileInfo ChildFile(this DirectoryInfo parent, String child)
+        {
+            return new FileInfo(parent.FullName + "/" + child);
         }
     }
 
@@ -291,7 +331,7 @@ namespace MMD
         /// </summary>
         /// <returns>Unity用剛体ゲームオブジェクト</returns>
         /// <param name='rigidbody'>PMX用剛体データ</param>
-        public static UnityEngine.GameObject ConvertRigidbody(this PMXFormat.Rigidbody rigidbody, string model_name, int i, float scale, string export_folder)
+        public static UnityEngine.GameObject ConvertRigidbody(this PMXFormat.Rigidbody rigidbody, string model_name, int i, float scale, DirectoryInfo physics_folder)
         {
             var result = new UnityEngine.GameObject("r" + rigidbody.name);
             //result.AddComponent<Rigidbody>();	// 1つのゲームオブジェクトに複数の剛体が付く事が有るので本体にはrigidbodyを適用しない
@@ -318,8 +358,8 @@ namespace MMD
 
             // マテリアルの設定
             var material = CreatePhysicMaterial(rigidbody, model_name, i);
-            string file_name = export_folder + "/Physics/" + i.ToString() + "_" + rigidbody.name.GetFilePathString() + ".asset";
-            UnityEditor.AssetDatabase.CreateAsset(material, file_name);
+            var file_name = physics_folder.ChildFile(i.ToString() + "_" + rigidbody.name + ".asset");
+            UnityEditor.AssetDatabase.CreateAsset(material, file_name.GetUnityAssetPath());
             result.GetComponent<UnityEngine.Collider>().material = material;
 
             return result;

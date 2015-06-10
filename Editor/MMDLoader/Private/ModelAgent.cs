@@ -26,7 +26,7 @@ namespace MMD
             private set;
         }
 
-        public string PrefabPath
+        public FileInfo PrefabPath
         {
             get;
             private set;
@@ -112,25 +112,23 @@ namespace MMD
             }
             Header = pmx_format.header;
 
-            var export_folder=Path.Combine(Path.GetDirectoryName(pmx_format.path), Path.GetFileNameWithoutExtension(pmx_format.path) + ".convert");
+            var export_folder=pmx_format.path.Directory.ChildDirectory(pmx_format.path.GetNameWithoutExtension() + ".convert");
             export_folder.CreateUnityFolder();
-            var mesh_folder = export_folder + "/Meshes/";
+            var mesh_folder = export_folder.ChildDirectory("Meshes");
             mesh_folder.CreateUnityFolder();
-            var texture_folder = export_folder + "/Textures/";
+            var texture_folder = export_folder.ChildDirectory("Textures");
             texture_folder.CreateUnityFolder();
-            var material_folder = export_folder + "/Materials/";
+            var material_folder = export_folder.ChildDirectory("Materials");
             material_folder.CreateUnityFolder();
-            var physics_folder = export_folder + "/Physics/";
+            var physics_folder = export_folder.ChildDirectory("Physics");
             physics_folder.CreateUnityFolder();
-
-            //全マテリアルを作成
-
+            UnityEditor.AssetDatabase.Refresh();
 
             // プレファブパスの設定
-            PrefabPath = export_folder + "/" + Path.GetFileNameWithoutExtension(pmx_format.path) + ".prefab";
+            PrefabPath = export_folder.ChildFile(pmx_format.path.GetNameWithoutExtension() + ".prefab");
 
             return PMXConverter.CreateGameObject(export_folder
-                , mesh_folder, texture_folder, material_folder
+                , mesh_folder, texture_folder, material_folder, physics_folder
                 , pmx_format, use_rigidbody, animation_type, use_ik, scale);
         }
     }

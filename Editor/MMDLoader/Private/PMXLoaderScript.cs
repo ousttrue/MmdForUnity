@@ -61,7 +61,7 @@ public partial class PMXLoaderScript {
 	private PMXFormat Read() {
         format_ = new PMXFormat
         {
-            path=file_path_,
+            path=new FileInfo(file_path_),
         };
 		format_.header = ReadHeader();
         format_.vertices = Enumerable.Range(0, binary_reader_.ReadInt32())

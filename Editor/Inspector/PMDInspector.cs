@@ -106,7 +106,7 @@ namespace MMD
                                         , pmd_config.scale
                                         );
                 // プレファブ化
-                PrefabUtility.CreatePrefab(model_agent.PrefabPath, go, ReplacePrefabOptions.ConnectToPrefab);
+                PrefabUtility.CreatePrefab(model_agent.PrefabPath.GetUnityAssetPath(), go, ReplacePrefabOptions.ConnectToPrefab);
 
                 // アセットリストの更新
                 AssetDatabase.Refresh();

@@ -36,11 +36,11 @@ namespace MMD
         /// <param name='animation_type'>アニメーションタイプ</param>
         /// <param name='use_ik'>IKを使用するか</param>
         /// <param name='scale'>スケール</param>
-        public static UnityEngine.GameObject CreateGameObject(string export_folder
-            , string mesh_folder, string texture_folder, string material_folder
+        public static UnityEngine.GameObject CreateGameObject(DirectoryInfo export_folder
+            , DirectoryInfo mesh_folder, DirectoryInfo texture_folder, DirectoryInfo material_folder, DirectoryInfo physics_folder
             , PMXFormat format, bool use_rigidbody, AnimationType animation_type, bool use_ik, float scale)
         {
-            var root = new UnityEngine.GameObject(Path.GetFileNameWithoutExtension(format.path));
+            var root = new UnityEngine.GameObject(format.path.GetNameWithoutExtension());
 
             //MMDEngine追加
             MMDEngine engine = root.AddComponent<MMDEngine>();
@@ -62,8 +62,9 @@ namespace MMD
             var meshes = creation_list.Select((c, i)=>{
                 var mesh = EntryAttributesForMesh(c, format, scale);
                 SetSubMesh(mesh, c);
-                string file_name = mesh_folder + i.ToString() + "_" + Path.GetFileNameWithoutExtension(format.path).GetFilePathString() + ".asset";
-                UnityEditor.AssetDatabase.CreateAsset(mesh, file_name);
+                var file_name = mesh_folder.ChildFile(i.ToString() + "_" + format.path.GetNameWithoutExtension() + ".asset");
+                UnityEngine.Debug.Log(file_name.GetUnityAssetPath());
+                UnityEditor.AssetDatabase.CreateAsset(mesh, file_name.GetUnityAssetPath());
                 return mesh;
             }).ToArray();									
             progress += progressUnit;
@@ -72,9 +73,9 @@ namespace MMD
             format.textures
                 .ForEach((x, i) =>
             {
-                var src = Path.Combine(Path.GetDirectoryName(format.path), x);
-                var dst = Path.Combine(texture_folder, x);
-                UnityEditor.AssetDatabase.CopyAsset(src, dst);
+                var src = format.path.Directory.ChildFile(x);
+                var dst = texture_folder.ChildFile(x);
+                UnityEditor.AssetDatabase.CopyAsset(src.GetUnityAssetPath(), dst.GetUnityAssetPath());
             });
 
             // マテリアルの生成・設定
@@ -84,7 +85,8 @@ namespace MMD
                 {
                     var is_transparent = (x.diffuse_color.a < 1.0f) || (x.edge_color.a < 1.0f);
                     var is_transparent_by_morph = IsTransparentByMaterialMorph(format)[i];
-                    var texture = GetTextureList(export_folder, format)[i];
+                    var list=GetTextureList(export_folder, format);
+                    var texture = list[i];
                     var uv = GetUvList(format)[i];
                     var is_transparent_by_texture = texture != null
                                                     ? IsTransparentByTextureAlphaWithUv(texture, uv)
@@ -96,8 +98,8 @@ namespace MMD
 
             materials.ZipForEach(format.materials, (m, src, i) =>
             {
-                var file_name = material_folder + i.ToString() + "_" + src.name.GetFilePathString() + ".asset";
-                UnityEditor.AssetDatabase.CreateAsset(m, file_name);
+                var file_name = material_folder.ChildFile(i.ToString() + "_" + src.name + ".asset");
+                UnityEditor.AssetDatabase.CreateAsset(m, file_name.GetUnityAssetPath());
             });
 
             //メッシュ単位へ振り分け
@@ -133,7 +135,7 @@ namespace MMD
             if (use_rigidbody)
             {
                 // 剛体の登録
-                var rigids = format.rigidbodies.Select((x, i) => x.ConvertRigidbody(Path.GetFileNameWithoutExtension(format.path), i, scale, export_folder)).ToArray();
+                var rigids = format.rigidbodies.Select((x, i) => x.ConvertRigidbody(format.path.GetNameWithoutExtension(), i, scale, physics_folder)).ToArray();
                 AssignRigidbodyToBone(format, bones, rigids).transform.parent = root.transform;
 
                 SetRigidsSettings(format, bones, rigids);
@@ -168,8 +170,8 @@ namespace MMD
                         throw new System.ArgumentException();
                 }
 
-                string file_name = export_folder + "/" + Path.GetFileNameWithoutExtension(format.path).GetFilePathString() + ".avatar.asset";
-                avatar_setting.CreateAsset(file_name);
+                var file_name = export_folder.ChildFile(format.path.GetNameWithoutExtension() + ".avatar.asset");
+                avatar_setting.CreateAsset(file_name.GetUnityAssetPath());
             }
             else
             {
@@ -306,7 +308,7 @@ namespace MMD
         /// テクスチャの取得
         /// </summary>
         /// <returns>テクスチャ配列</returns>
-        static UnityEngine.Texture2D[] GetTextureList(String export_folder, PMXFormat format)
+        static UnityEngine.Texture2D[] GetTextureList(DirectoryInfo export_folder, PMXFormat format)
         {
             var texture_list = format.materials
                 .Select(x => x.usually_texture_index)
@@ -314,8 +316,8 @@ namespace MMD
                 ;
 
             using(var alpha_readable_texture_ = new AlphaReadableTexture(texture_list.ToArray()
-                                                            , Path.GetDirectoryName(format.path) + "/"
-                                                            , export_folder + "/Materials/"
+                                                            , format.path.Directory
+                                                            , export_folder.ChildDirectory("Materials")
                                                             ))
                                                             {
                 return alpha_readable_texture_.textures;
@@ -511,15 +513,19 @@ namespace MMD
         /// <param name='is_transparent'>透過か</param>
         static UnityEngine.Material ConvertMaterial(PMXFormat format, UnityEngine.GameObject root, int material_index, bool is_transparent, float scale)
         {
+            var model_folder = format.path.Directory;
+
             PMXFormat.Material material = format.materials[material_index];
 
             //先にテクスチャ情報を検索
             UnityEngine.Texture2D main_texture = null;
             if (material.usually_texture_index > -1 && material.usually_texture_index < format.textures.Length)
             {
-                string texture_file_name = format.textures[material.usually_texture_index];
-                string path = Path.GetDirectoryName(format.path) + "/" + texture_file_name;
-                main_texture = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(path);
+                var texture_name=format.textures[material.usually_texture_index];
+                if(!String.IsNullOrEmpty(texture_name)){
+                    var path = model_folder.ChildFile(texture_name);
+                    main_texture = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(path.GetUnityAssetPath());
+                }
             }
 
             //マテリアルに設定
@@ -556,8 +562,8 @@ namespace MMD
             if (material.sphere_texture_index > -1 && material.sphere_texture_index < format.textures.Length)
             {
                 string sphere_texture_file_name = format.textures[material.sphere_texture_index];
-                string path = Path.GetDirectoryName(format.path) + "/" + sphere_texture_file_name;
-                var sphere_texture = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(path);
+                var path = model_folder.ChildFile(sphere_texture_file_name);
+                var sphere_texture = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(path.GetUnityAssetPath());
 
                 switch (material.sphere_mode)
                 {

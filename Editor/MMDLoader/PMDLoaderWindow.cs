@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEditor;
+using MMD;
 
 public class PMDLoaderWindow : EditorWindow
 {
@@ -54,7 +55,7 @@ public class PMDLoaderWindow : EditorWindow
                                 );
 
         // プレファブ化
-        PrefabUtility.CreatePrefab(model_agent.PrefabPath, go, ReplacePrefabOptions.ConnectToPrefab);
+        PrefabUtility.CreatePrefab(model_agent.PrefabPath.GetUnityAssetPath(), go, ReplacePrefabOptions.ConnectToPrefab);
 
         // アセットリストの更新
         AssetDatabase.Refresh();

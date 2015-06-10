@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using UnityEngine;
 
 namespace MMD {
@@ -7,7 +8,7 @@ namespace MMD {
 		// PMXフォーマットクラス
 		public class PMXFormat
 		{
-			public String path;
+			public FileInfo path;
 			public Header header;
 			public Vertex[] vertices;
 			public Int32[] indices;
